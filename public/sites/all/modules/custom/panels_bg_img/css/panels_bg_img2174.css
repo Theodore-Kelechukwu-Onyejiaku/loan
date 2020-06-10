@@ -1,0 +1,12 @@
+.colorpicker{
+	z-index: 2000;
+}
+.colorpicker input{
+	height: 16px;
+	top: 1px;;
+}
+
+.panels-bootstrap-row-451-main div picture, .white-bg {
+ background-color: white;
+ padding-bottom: 10px;
+}

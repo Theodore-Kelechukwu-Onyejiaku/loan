@@ -1,0 +1,1200 @@
+/**
+ * jquery.mask.js
+ * @version: v1.14.15
+ * @author: Igor Escobar
+ *
+ * Created by Igor Escobar on 2012-03-10. Please report any bug at github.com/igorescobar/jQuery-Mask-Plugin
+ *
+ * Copyright (c) 2012 Igor Escobar http://igorescobar.com
+ *
+ * The MIT License (http://www.opensource.org/licenses/mit-license.php)
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/* jshint laxbreak: true */
+/* jshint maxcomplexity:17 */
+/* global define */
+
+// UMD (Universal Module Definition) patterns for JavaScript modules that work everywhere.
+// https://github.com/umdjs/umd/blob/master/templates/jqueryPlugin.js
+(function (factory, jQuery, Zepto) {
+
+    if (typeof define === 'function' && define.amd) {
+        define(['jquery'], factory);
+    } else if (typeof exports === 'object') {
+        module.exports = factory(require('jquery'));
+    } else {
+        factory(jQuery || Zepto);
+    }
+
+}(function ($) {
+    'use strict';
+
+    var Mask = function (el, mask, options) {
+
+        var p = {
+            invalid: [],
+            getCaret: function () {
+                try {
+                    var sel,
+                        pos = 0,
+                        ctrl = el.get(0),
+                        dSel = document.selection,
+                        cSelStart = ctrl.selectionStart;
+
+                    // IE Support
+                    if (dSel && navigator.appVersion.indexOf('MSIE 10') === -1) {
+                        sel = dSel.createRange();
+                        sel.moveStart('character', -p.val().length);
+                        pos = sel.text.length;
+                    }
+                    // Firefox support
+                    else if (cSelStart || cSelStart === '0') {
+                        pos = cSelStart;
+                    }
+
+                    return pos;
+                } catch (e) {}
+            },
+            setCaret: function(pos) {
+                try {
+                    if (el.is(':focus')) {
+                        var range, ctrl = el.get(0);
+
+                        // Firefox, WebKit, etc..
+                        if (ctrl.setSelectionRange) {
+                            ctrl.setSelectionRange(pos, pos);
+                        } else { // IE
+                            range = ctrl.createTextRange();
+                            range.collapse(true);
+                            range.moveEnd('character', pos);
+                            range.moveStart('character', pos);
+                            range.select();
+                        }
+                    }
+                } catch (e) {}
+            },
+            events: function() {
+                el
+                .on('keydown.mask', function(e) {
+                    el.data('mask-keycode', e.keyCode || e.which);
+                    el.data('mask-previus-value', el.val());
+                    el.data('mask-previus-caret-pos', p.getCaret());
+                    p.maskDigitPosMapOld = p.maskDigitPosMap;
+                })
+                .on($.jMaskGlobals.useInput ? 'input.mask' : 'keyup.mask', p.behaviour)
+                .on('paste.mask drop.mask', function() {
+                    setTimeout(function() {
+                        el.keydown().keyup();
+                    }, 100);
+                })
+                .on('change.mask', function(){
+                    el.data('changed', true);
+                })
+                .on('blur.mask', function(){
+                    if (oldValue !== p.val() && !el.data('changed')) {
+                        el.trigger('change');
+                    }
+                    el.data('changed', false);
+                })
+                // it's very important that this callback remains in this position
+                // otherwhise oldValue it's going to work buggy
+                .on('blur.mask', function() {
+                    oldValue = p.val();
+                })
+                // select all text on focus
+                .on('focus.mask', function (e) {
+                    if (options.selectOnFocus === true) {
+                        $(e.target).select();
+                    }
+                })
+                // clear the value if it not complete the mask
+                .on('focusout.mask', function() {
+                    if (options.clearIfNotMatch && !regexMask.test(p.val())) {
+                       p.val('');
+                   }
+                });
+            },
+            getRegexMask: function() {
+                var maskChunks = [], translation, pattern, optional, recursive, oRecursive, r;
+
+                for (var i = 0; i < mask.length; i++) {
+                    translation = jMask.translation[mask.charAt(i)];
+
+                    if (translation) {
+
+                        pattern = translation.pattern.toString().replace(/.{1}$|^.{1}/g, '');
+                        optional = translation.optional;
+                        recursive = translation.recursive;
+
+                        if (recursive) {
+                            maskChunks.push(mask.charAt(i));
+                            oRecursive = {digit: mask.charAt(i), pattern: pattern};
+                        } else {
+                            maskChunks.push(!optional && !recursive ? pattern : (pattern + '?'));
+                        }
+
+                    } else {
+                        maskChunks.push(mask.charAt(i).replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+                    }
+                }
+
+                r = maskChunks.join('');
+
+                if (oRecursive) {
+                    r = r.replace(new RegExp('(' + oRecursive.digit + '(.*' + oRecursive.digit + ')?)'), '($1)?')
+                         .replace(new RegExp(oRecursive.digit, 'g'), oRecursive.pattern);
+                }
+
+                return new RegExp(r);
+            },
+            destroyEvents: function() {
+                el.off(['input', 'keydown', 'keyup', 'paste', 'drop', 'blur', 'focusout', ''].join('.mask '));
+            },
+            val: function(v) {
+                var isInput = el.is('input'),
+                    method = isInput ? 'val' : 'text',
+                    r;
+
+                if (arguments.length > 0) {
+                    if (el[method]() !== v) {
+                        el[method](v);
+                    }
+                    r = el;
+                } else {
+                    r = el[method]();
+                }
+
+                return r;
+            },
+            calculateCaretPosition: function() {
+                var oldVal = el.data('mask-previus-value') || '',
+                    newVal = p.getMasked(),
+                    caretPosNew = p.getCaret();
+                if (oldVal !== newVal) {
+                    var caretPosOld = el.data('mask-previus-caret-pos') || 0,
+                        newValL = newVal.length,
+                        oldValL = oldVal.length,
+                        maskDigitsBeforeCaret = 0,
+                        maskDigitsAfterCaret = 0,
+                        maskDigitsBeforeCaretAll = 0,
+                        maskDigitsBeforeCaretAllOld = 0,
+                        i = 0;
+
+                    for (i = caretPosNew; i < newValL; i++) {
+                        if (!p.maskDigitPosMap[i]) {
+                            break;
+                        }
+                        maskDigitsAfterCaret++;
+                    }
+
+                    for (i = caretPosNew - 1; i >= 0; i--) {
+                        if (!p.maskDigitPosMap[i]) {
+                            break;
+                        }
+                        maskDigitsBeforeCaret++;
+                    }
+
+                    for (i = caretPosNew - 1; i >= 0; i--) {
+                        if (p.maskDigitPosMap[i]) {
+                            maskDigitsBeforeCaretAll++;
+                        }
+                    }
+
+                    for (i = caretPosOld - 1; i >= 0; i--) {
+                        if (p.maskDigitPosMapOld[i]) {
+                            maskDigitsBeforeCaretAllOld++;
+                        }
+                    }
+
+                    // if the cursor is at the end keep it there
+                    if (caretPosNew > oldValL) {
+                      caretPosNew = newValL * 10;
+                    } else if (caretPosOld >= caretPosNew && caretPosOld !== oldValL) {
+                        if (!p.maskDigitPosMapOld[caretPosNew])  {
+                          var caretPos = caretPosNew;
+                          caretPosNew -= maskDigitsBeforeCaretAllOld - maskDigitsBeforeCaretAll;
+                          caretPosNew -= maskDigitsBeforeCaret;
+                          if (p.maskDigitPosMap[caretPosNew])  {
+                            caretPosNew = caretPos;
+                          }
+                        }
+                    }
+                    else if (caretPosNew > caretPosOld) {
+                        caretPosNew += maskDigitsBeforeCaretAll - maskDigitsBeforeCaretAllOld;
+                        caretPosNew += maskDigitsAfterCaret;
+                    }
+                }
+                return caretPosNew;
+            },
+            behaviour: function(e) {
+                e = e || window.event;
+                p.invalid = [];
+
+                var keyCode = el.data('mask-keycode');
+
+                if ($.inArray(keyCode, jMask.byPassKeys) === -1) {
+                    var newVal = p.getMasked(),
+                        caretPos = p.getCaret();
+
+                    // this is a compensation to devices/browsers that don't compensate
+                    // caret positioning the right way
+                    setTimeout(function() {
+                      p.setCaret(p.calculateCaretPosition());
+                    }, $.jMaskGlobals.keyStrokeCompensation);
+
+                    p.val(newVal);
+                    p.setCaret(caretPos);
+                    return p.callbacks(e);
+                }
+            },
+            getMasked: function(skipMaskChars, val) {
+                var buf = [],
+                    value = val === undefined ? p.val() : val + '',
+                    m = 0, maskLen = mask.length,
+                    v = 0, valLen = value.length,
+                    offset = 1, addMethod = 'push',
+                    resetPos = -1,
+                    maskDigitCount = 0,
+                    maskDigitPosArr = [],
+                    lastMaskChar,
+                    check;
+
+                if (options.reverse) {
+                    addMethod = 'unshift';
+                    offset = -1;
+                    lastMaskChar = 0;
+                    m = maskLen - 1;
+                    v = valLen - 1;
+                    check = function () {
+                        return m > -1 && v > -1;
+                    };
+                } else {
+                    lastMaskChar = maskLen - 1;
+                    check = function () {
+                        return m < maskLen && v < valLen;
+                    };
+                }
+
+                var lastUntranslatedMaskChar;
+                while (check()) {
+                    var maskDigit = mask.charAt(m),
+                        valDigit = value.charAt(v),
+                        translation = jMask.translation[maskDigit];
+
+                    if (translation) {
+                        if (valDigit.match(translation.pattern)) {
+                            buf[addMethod](valDigit);
+                             if (translation.recursive) {
+                                if (resetPos === -1) {
+                                    resetPos = m;
+                                } else if (m === lastMaskChar && m !== resetPos) {
+                                    m = resetPos - offset;
+                                }
+
+                                if (lastMaskChar === resetPos) {
+                                    m -= offset;
+                                }
+                            }
+                            m += offset;
+                        } else if (valDigit === lastUntranslatedMaskChar) {
+                            // matched the last untranslated (raw) mask character that we encountered
+                            // likely an insert offset the mask character from the last entry; fall
+                            // through and only increment v
+                            maskDigitCount--;
+                            lastUntranslatedMaskChar = undefined;
+                        } else if (translation.optional) {
+                            m += offset;
+                            v -= offset;
+                        } else if (translation.fallback) {
+                            buf[addMethod](translation.fallback);
+                            m += offset;
+                            v -= offset;
+                        } else {
+                          p.invalid.push({p: v, v: valDigit, e: translation.pattern});
+                        }
+                        v += offset;
+                    } else {
+                        if (!skipMaskChars) {
+                            buf[addMethod](maskDigit);
+                        }
+
+                        if (valDigit === maskDigit) {
+                            maskDigitPosArr.push(v);
+                            v += offset;
+                        } else {
+                            lastUntranslatedMaskChar = maskDigit;
+                            maskDigitPosArr.push(v + maskDigitCount);
+                            maskDigitCount++;
+                        }
+
+                        m += offset;
+                    }
+                }
+
+                var lastMaskCharDigit = mask.charAt(lastMaskChar);
+                if (maskLen === valLen + 1 && !jMask.translation[lastMaskCharDigit]) {
+                    buf.push(lastMaskCharDigit);
+                }
+
+                var newVal = buf.join('');
+                p.mapMaskdigitPositions(newVal, maskDigitPosArr, valLen);
+                return newVal;
+            },
+            mapMaskdigitPositions: function(newVal, maskDigitPosArr, valLen) {
+              var maskDiff = options.reverse ? newVal.length - valLen : 0;
+              p.maskDigitPosMap = {};
+              for (var i = 0; i < maskDigitPosArr.length; i++) {
+                p.maskDigitPosMap[maskDigitPosArr[i] + maskDiff] = 1;
+              }
+            },
+            callbacks: function (e) {
+                var val = p.val(),
+                    changed = val !== oldValue,
+                    defaultArgs = [val, e, el, options],
+                    callback = function(name, criteria, args) {
+                        if (typeof options[name] === 'function' && criteria) {
+                            options[name].apply(this, args);
+                        }
+                    };
+
+                callback('onChange', changed === true, defaultArgs);
+                callback('onKeyPress', changed === true, defaultArgs);
+                callback('onComplete', val.length === mask.length, defaultArgs);
+                callback('onInvalid', p.invalid.length > 0, [val, e, el, p.invalid, options]);
+            }
+        };
+
+        el = $(el);
+        var jMask = this, oldValue = p.val(), regexMask;
+
+        mask = typeof mask === 'function' ? mask(p.val(), undefined, el,  options) : mask;
+
+        // public methods
+        jMask.mask = mask;
+        jMask.options = options;
+        jMask.remove = function() {
+            var caret = p.getCaret();
+            if (jMask.options.placeholder) {
+                el.removeAttr('placeholder');
+            }
+            if (el.data('mask-maxlength')) {
+                el.removeAttr('maxlength');
+            }
+            p.destroyEvents();
+            p.val(jMask.getCleanVal());
+            p.setCaret(caret);
+            return el;
+        };
+
+        // get value without mask
+        jMask.getCleanVal = function() {
+           return p.getMasked(true);
+        };
+
+        // get masked value without the value being in the input or element
+        jMask.getMaskedVal = function(val) {
+           return p.getMasked(false, val);
+        };
+
+       jMask.init = function(onlyMask) {
+            onlyMask = onlyMask || false;
+            options = options || {};
+
+            jMask.clearIfNotMatch  = $.jMaskGlobals.clearIfNotMatch;
+            jMask.byPassKeys       = $.jMaskGlobals.byPassKeys;
+            jMask.translation      = $.extend({}, $.jMaskGlobals.translation, options.translation);
+
+            jMask = $.extend(true, {}, jMask, options);
+
+            regexMask = p.getRegexMask();
+
+            if (onlyMask) {
+                p.events();
+                p.val(p.getMasked());
+            } else {
+                if (options.placeholder) {
+                    el.attr('placeholder' , options.placeholder);
+                }
+
+                // this is necessary, otherwise if the user submit the form
+                // and then press the "back" button, the autocomplete will erase
+                // the data. Works fine on IE9+, FF, Opera, Safari.
+                if (el.data('mask')) {
+                  el.attr('autocomplete', 'off');
+                }
+
+                // detect if is necessary let the user type freely.
+                // for is a lot faster than forEach.
+                for (var i = 0, maxlength = true; i < mask.length; i++) {
+                    var translation = jMask.translation[mask.charAt(i)];
+                    if (translation && translation.recursive) {
+                        maxlength = false;
+                        break;
+                    }
+                }
+
+                if (maxlength) {
+                    el.attr('maxlength', mask.length).data('mask-maxlength', true);
+                }
+
+                p.destroyEvents();
+                p.events();
+
+                var caret = p.getCaret();
+                p.val(p.getMasked());
+                p.setCaret(caret);
+            }
+        };
+
+        jMask.init(!el.is('input'));
+    };
+
+    $.maskWatchers = {};
+    var HTMLAttributes = function () {
+        var input = $(this),
+            options = {},
+            prefix = 'data-mask-',
+            mask = input.attr('data-mask');
+
+        if (input.attr(prefix + 'reverse')) {
+            options.reverse = true;
+        }
+
+        if (input.attr(prefix + 'clearifnotmatch')) {
+            options.clearIfNotMatch = true;
+        }
+
+        if (input.attr(prefix + 'selectonfocus') === 'true') {
+           options.selectOnFocus = true;
+        }
+
+        if (notSameMaskObject(input, mask, options)) {
+            return input.data('mask', new Mask(this, mask, options));
+        }
+    },
+    notSameMaskObject = function(field, mask, options) {
+        options = options || {};
+        var maskObject = $(field).data('mask'),
+            stringify = JSON.stringify,
+            value = $(field).val() || $(field).text();
+        try {
+            if (typeof mask === 'function') {
+                mask = mask(value);
+            }
+            return typeof maskObject !== 'object' || stringify(maskObject.options) !== stringify(options) || maskObject.mask !== mask;
+        } catch (e) {}
+    },
+    eventSupported = function(eventName) {
+        var el = document.createElement('div'), isSupported;
+
+        eventName = 'on' + eventName;
+        isSupported = (eventName in el);
+
+        if ( !isSupported ) {
+            el.setAttribute(eventName, 'return;');
+            isSupported = typeof el[eventName] === 'function';
+        }
+        el = null;
+
+        return isSupported;
+    };
+
+    $.fn.mask = function(mask, options) {
+        options = options || {};
+        var selector = this.selector,
+            globals = $.jMaskGlobals,
+            interval = globals.watchInterval,
+            watchInputs = options.watchInputs || globals.watchInputs,
+            maskFunction = function() {
+                if (notSameMaskObject(this, mask, options)) {
+                    return $(this).data('mask', new Mask(this, mask, options));
+                }
+            };
+
+        $(this).each(maskFunction);
+
+        if (selector && selector !== '' && watchInputs) {
+            clearInterval($.maskWatchers[selector]);
+            $.maskWatchers[selector] = setInterval(function(){
+                $(document).find(selector).each(maskFunction);
+            }, interval);
+        }
+        return this;
+    };
+
+    $.fn.masked = function(val) {
+        return this.data('mask').getMaskedVal(val);
+    };
+
+    $.fn.unmask = function() {
+        clearInterval($.maskWatchers[this.selector]);
+        delete $.maskWatchers[this.selector];
+        return this.each(function() {
+            var dataMask = $(this).data('mask');
+            if (dataMask) {
+                dataMask.remove().removeData('mask');
+            }
+        });
+    };
+
+    $.fn.cleanVal = function() {
+        return this.data('mask').getCleanVal();
+    };
+
+    $.applyDataMask = function(selector) {
+        selector = selector || $.jMaskGlobals.maskElements;
+        var $selector = (selector instanceof $) ? selector : $(selector);
+        $selector.filter($.jMaskGlobals.dataMaskAttr).each(HTMLAttributes);
+    };
+
+    var globals = {
+        maskElements: 'input,td,span,div',
+        dataMaskAttr: '*[data-mask]',
+        dataMask: true,
+        watchInterval: 300,
+        watchInputs: true,
+        keyStrokeCompensation: 10,
+        // old versions of chrome dont work great with input event
+        useInput: !/Chrome\/[2-4][0-9]|SamsungBrowser/.test(window.navigator.userAgent) && eventSupported('input'),
+        watchDataMask: false,
+        byPassKeys: [9, 16, 17, 18, 36, 37, 38, 39, 40, 91],
+        translation: {
+            '0': {pattern: /\d/},
+            '9': {pattern: /\d/, optional: true},
+            '#': {pattern: /\d/, recursive: true},
+            'A': {pattern: /[a-zA-Z0-9]/},
+            'S': {pattern: /[a-zA-Z]/}
+        }
+    };
+
+    $.jMaskGlobals = $.jMaskGlobals || {};
+    globals = $.jMaskGlobals = $.extend(true, {}, globals, $.jMaskGlobals);
+
+    // looking for inputs with data-mask attribute
+    if (globals.dataMask) {
+        $.applyDataMask();
+    }
+
+    setInterval(function() {
+        if ($.jMaskGlobals.watchDataMask) {
+            $.applyDataMask();
+        }
+    }, globals.watchInterval);
+}, window.jQuery, window.Zepto));
+
+;/*})'"*/
+;/*})'"*/
+/**
+ * @file
+ * Some basic behaviors and utility functions for Views.
+ */
+(function ($) {
+
+  Drupal.Views = {};
+
+  /**
+   * JQuery UI tabs, Views integration component.
+   */
+  Drupal.behaviors.viewsTabs = {
+    attach: function (context) {
+      if ($.viewsUi && $.viewsUi.tabs) {
+        $('#views-tabset').once('views-processed').viewsTabs({
+          selectedClass: 'active'
+        });
+      }
+
+      $('a.views-remove-link').once('views-processed').click(function(event) {
+        var id = $(this).attr('id').replace('views-remove-link-', '');
+        $('#views-row-' + id).hide();
+        $('#views-removed-' + id).attr('checked', true);
+        event.preventDefault();
+      });
+      /**
+    * Here is to handle display deletion
+    * (checking in the hidden checkbox and hiding out the row).
+    */
+      $('a.display-remove-link')
+        .addClass('display-processed')
+        .click(function() {
+          var id = $(this).attr('id').replace('display-remove-link-', '');
+          $('#display-row-' + id).hide();
+          $('#display-removed-' + id).attr('checked', true);
+          return false;
+        });
+    }
+  };
+
+  /**
+ * Helper function to parse a querystring.
+ */
+  Drupal.Views.parseQueryString = function (query) {
+    var args = {};
+    var pos = query.indexOf('?');
+    if (pos != -1) {
+      query = query.substring(pos + 1);
+    }
+    var pairs = query.split('&');
+    for (var i in pairs) {
+      if (typeof(pairs[i]) == 'string') {
+        var pair = pairs[i].split('=');
+        // Ignore the 'q' path argument, if present.
+        if (pair[0] != 'q' && pair[1]) {
+          args[decodeURIComponent(pair[0].replace(/\+/g, ' '))] = decodeURIComponent(pair[1].replace(/\+/g, ' '));
+        }
+      }
+    }
+    return args;
+  };
+
+  /**
+ * Helper function to return a view's arguments based on a path.
+ */
+  Drupal.Views.parseViewArgs = function (href, viewPath) {
+
+    // Provide language prefix.
+    if (Drupal.settings.pathPrefix) {
+      var viewPath = Drupal.settings.pathPrefix + viewPath;
+    }
+    var returnObj = {};
+    var path = Drupal.Views.getPath(href);
+    // Ensure we have a correct path.
+    if (viewPath && path.substring(0, viewPath.length + 1) == viewPath + '/') {
+      var args = decodeURIComponent(path.substring(viewPath.length + 1, path.length));
+      returnObj.view_args = args;
+      returnObj.view_path = path;
+    }
+    return returnObj;
+  };
+
+  /**
+ * Strip off the protocol plus domain from an href.
+ */
+  Drupal.Views.pathPortion = function (href) {
+    // Remove e.g. http://example.com if present.
+    var protocol = window.location.protocol;
+    if (href.substring(0, protocol.length) == protocol) {
+      // 2 is the length of the '//' that normally follows the protocol.
+      href = href.substring(href.indexOf('/', protocol.length + 2));
+    }
+    return href;
+  };
+
+  /**
+ * Return the Drupal path portion of an href.
+ */
+  Drupal.Views.getPath = function (href) {
+    href = Drupal.Views.pathPortion(href);
+    href = href.substring(Drupal.settings.basePath.length, href.length);
+    // 3 is the length of the '?q=' added to the url without clean urls.
+    if (href.substring(0, 3) == '?q=') {
+      href = href.substring(3, href.length);
+    }
+    var chars = ['#', '?', '&'];
+    for (var i in chars) {
+      if (href.indexOf(chars[i]) > -1) {
+        href = href.substr(0, href.indexOf(chars[i]));
+      }
+    }
+    return href;
+  };
+
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/
+(function ($) {
+
+/**
+ * A progressbar object. Initialized with the given id. Must be inserted into
+ * the DOM afterwards through progressBar.element.
+ *
+ * method is the function which will perform the HTTP request to get the
+ * progress bar state. Either "GET" or "POST".
+ *
+ * e.g. pb = new progressBar('myProgressBar');
+ *      some_element.appendChild(pb.element);
+ */
+Drupal.progressBar = function (id, updateCallback, method, errorCallback) {
+  var pb = this;
+  this.id = id;
+  this.method = method || 'GET';
+  this.updateCallback = updateCallback;
+  this.errorCallback = errorCallback;
+
+  // The WAI-ARIA setting aria-live="polite" will announce changes after users
+  // have completed their current activity and not interrupt the screen reader.
+  this.element = $('<div class="progress" aria-live="polite"></div>').attr('id', id);
+  this.element.html('<div class="bar"><div class="filled"></div></div>' +
+                    '<div class="percentage"></div>' +
+                    '<div class="message">&nbsp;</div>');
+};
+
+/**
+ * Set the percentage and status message for the progressbar.
+ */
+Drupal.progressBar.prototype.setProgress = function (percentage, message) {
+  if (percentage >= 0 && percentage <= 100) {
+    $('div.filled', this.element).css('width', percentage + '%');
+    $('div.percentage', this.element).html(percentage + '%');
+  }
+  $('div.message', this.element).html(message);
+  if (this.updateCallback) {
+    this.updateCallback(percentage, message, this);
+  }
+};
+
+/**
+ * Start monitoring progress via Ajax.
+ */
+Drupal.progressBar.prototype.startMonitoring = function (uri, delay) {
+  this.delay = delay;
+  this.uri = uri;
+  this.sendPing();
+};
+
+/**
+ * Stop monitoring progress via Ajax.
+ */
+Drupal.progressBar.prototype.stopMonitoring = function () {
+  clearTimeout(this.timer);
+  // This allows monitoring to be stopped from within the callback.
+  this.uri = null;
+};
+
+/**
+ * Request progress data from server.
+ */
+Drupal.progressBar.prototype.sendPing = function () {
+  if (this.timer) {
+    clearTimeout(this.timer);
+  }
+  if (this.uri) {
+    var pb = this;
+    // When doing a post request, you need non-null data. Otherwise a
+    // HTTP 411 or HTTP 406 (with Apache mod_security) error may result.
+    $.ajax({
+      type: this.method,
+      url: this.uri,
+      data: '',
+      dataType: 'json',
+      success: function (progress) {
+        // Display errors.
+        if (progress.status == 0) {
+          pb.displayError(progress.data);
+          return;
+        }
+        // Update display.
+        pb.setProgress(progress.percentage, progress.message);
+        // Schedule next timer.
+        pb.timer = setTimeout(function () { pb.sendPing(); }, pb.delay);
+      },
+      error: function (xmlhttp) {
+        pb.displayError(Drupal.ajaxError(xmlhttp, pb.uri));
+      }
+    });
+  }
+};
+
+/**
+ * Display errors on the page.
+ */
+Drupal.progressBar.prototype.displayError = function (string) {
+  var error = $('<div class="messages error"></div>').html(string);
+  $(this.element).before(error).hide();
+
+  if (this.errorCallback) {
+    this.errorCallback(this);
+  }
+};
+
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/
+/**
+ * @file
+ * Handles AJAX fetching of views, including filter submission and response.
+ */
+(function ($) {
+
+  /**
+   * Attaches the AJAX behavior to exposed filter forms and key views links.
+   */
+  Drupal.behaviors.ViewsAjaxView = {};
+  Drupal.behaviors.ViewsAjaxView.attach = function() {
+    if (Drupal.settings && Drupal.settings.views && Drupal.settings.views.ajaxViews) {
+      $.each(Drupal.settings.views.ajaxViews, function(i, settings) {
+        Drupal.views.instances[i] = new Drupal.views.ajaxView(settings);
+      });
+    }
+  };
+
+  Drupal.views = {};
+  Drupal.views.instances = {};
+
+  /**
+   * JavaScript object for a certain view.
+   */
+  Drupal.views.ajaxView = function(settings) {
+    var selector = '.view-dom-id-' + settings.view_dom_id;
+    this.$view = $(selector);
+
+    // Retrieve the path to use for views' ajax.
+    var ajax_path = Drupal.settings.views.ajax_path;
+
+    // If there are multiple views this might've ended up showing up multiple
+    // times.
+    if (ajax_path.constructor.toString().indexOf("Array") != -1) {
+      ajax_path = ajax_path[0];
+    }
+
+    // Check if there are any GET parameters to send to views.
+    var queryString = window.location.search || '';
+    if (queryString !== '') {
+      // Remove the question mark and Drupal path component if any.
+      var queryString = queryString.slice(1).replace(/q=[^&]+&?|&?render=[^&]+/, '');
+      if (queryString !== '') {
+        // If there is a '?' in ajax_path, clean url are on and & should be
+        // used to add parameters.
+        queryString = ((/\?/.test(ajax_path)) ? '&' : '?') + queryString;
+      }
+    }
+
+    this.element_settings = {
+      url: ajax_path + queryString,
+      submit: settings,
+      setClick: true,
+      event: 'click',
+      selector: selector,
+      progress: {
+        type: 'throbber'
+      }
+    };
+
+    this.settings = settings;
+
+    // Add the ajax to exposed forms.
+    this.$exposed_form = $('#views-exposed-form-' + settings.view_name.replace(/_/g, '-') + '-' + settings.view_display_id.replace(/_/g, '-'));
+    this.$exposed_form.once(jQuery.proxy(this.attachExposedFormAjax, this));
+
+    // Store Drupal.ajax objects here for all pager links.
+    this.links = [];
+
+    // Add the ajax to pagers.
+    this.$view
+      .once(jQuery.proxy(this.attachPagerAjax, this));
+
+    // Add a trigger to update this view specifically. In order to trigger a
+    // refresh use the following code.
+    //
+    // @code
+    // jQuery('.view-name').trigger('RefreshView');
+    // @endcode
+    // Add a trigger to update this view specifically.
+    var self_settings = this.element_settings;
+    self_settings.event = 'RefreshView';
+    this.refreshViewAjax = new Drupal.ajax(this.selector, this.$view, self_settings);
+  };
+
+  Drupal.views.ajaxView.prototype.attachExposedFormAjax = function() {
+    var button = $('input[type=submit], button[type=submit], input[type=image]', this.$exposed_form);
+    button = button[0];
+
+    // Call the autocomplete submit before doing AJAX.
+    $(button).click(function () {
+      if (Drupal.autocompleteSubmit) {
+        Drupal.autocompleteSubmit();
+      }
+    });
+
+    this.exposedFormAjax = new Drupal.ajax($(button).attr('id'), button, this.element_settings);
+  };
+
+  /**
+   * Attach the ajax behavior to each link.
+   */
+  Drupal.views.ajaxView.prototype.attachPagerAjax = function() {
+    this.$view.find('ul.pager > li > a, th.views-field a, .attachment .views-summary a')
+      .each(jQuery.proxy(this.attachPagerLinkAjax, this));
+  };
+
+  /**
+   * Attach the ajax behavior to a singe link.
+   */
+  Drupal.views.ajaxView.prototype.attachPagerLinkAjax = function(id, link) {
+    var $link = $(link);
+    // Don't attach to pagers inside nested views.
+    if ($link.closest('.view')[0] !== this.$view[0]) {
+      return;
+    }
+    var viewData = {};
+    var href = $link.attr('href');
+
+    // Provide a default page if none has been set. This must be done
+    // prior to merging with settings to avoid accidentally using the
+    // page landed on instead of page 1.
+    if (typeof(viewData.page) === 'undefined') {
+      viewData.page = 0;
+    }
+
+    // Construct an object using the settings defaults and then overriding
+    // with data specific to the link.
+    $.extend(
+    viewData,
+    this.settings,
+    Drupal.Views.parseQueryString(href),
+    // Extract argument data from the URL.
+    Drupal.Views.parseViewArgs(href, this.settings.view_base_path)
+    );
+
+    // For anchor tags, these will go to the target of the anchor rather
+    // than the usual location.
+    $.extend(viewData, Drupal.Views.parseViewArgs(href, this.settings.view_base_path));
+
+    this.element_settings.submit = viewData;
+    this.pagerAjax = new Drupal.ajax(false, $link, this.element_settings);
+    this.links.push(this.pagerAjax);
+  };
+
+  Drupal.ajax.prototype.commands.viewsScrollTop = function (ajax, response, status) {
+    // Scroll to the top of the view. This will allow users
+    // to browse newly loaded content after e.g. clicking a pager
+    // link.
+    var offset = $(response.selector).offset();
+    // We can't guarantee that the scrollable object should be
+    // the body, as the view could be embedded in something
+    // more complex such as a modal popup. Recurse up the DOM
+    // and scroll the first element that has a non-zero top.
+    var scrollTarget = response.selector;
+    while ($(scrollTarget).scrollTop() == 0 && $(scrollTarget).parent()) {
+      scrollTarget = $(scrollTarget).parent();
+    }
+    // Only scroll upward.
+    if (offset.top - 10 < $(scrollTarget).scrollTop()) {
+      $(scrollTarget).animate({scrollTop: (offset.top - 10)}, 500);
+    }
+  };
+
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/
+(function ($) {
+
+Drupal.googleanalytics = {};
+
+$(document).ready(function() {
+
+  // Attach mousedown, keyup, touchstart events to document only and catch
+  // clicks on all elements.
+  $(document.body).bind("mousedown keyup touchstart", function(event) {
+
+    // Catch the closest surrounding link of a clicked element.
+    $(event.target).closest("a,area").each(function() {
+
+      // Is the clicked URL internal?
+      if (Drupal.googleanalytics.isInternal(this.href)) {
+        // Skip 'click' tracking, if custom tracking events are bound.
+        if ($(this).is('.colorbox') && (Drupal.settings.googleanalytics.trackColorbox)) {
+          // Do nothing here. The custom event will handle all tracking.
+          //console.info("Click on .colorbox item has been detected.");
+        }
+        // Is download tracking activated and the file extension configured for download tracking?
+        else if (Drupal.settings.googleanalytics.trackDownload && Drupal.googleanalytics.isDownload(this.href)) {
+          // Download link clicked.
+          ga("send", {
+            "hitType": "event",
+            "eventCategory": "Downloads",
+            "eventAction": Drupal.googleanalytics.getDownloadExtension(this.href).toUpperCase(),
+            "eventLabel": Drupal.googleanalytics.getPageUrl(this.href),
+            "transport": "beacon"
+          });
+        }
+        else if (Drupal.googleanalytics.isInternalSpecial(this.href)) {
+          // Keep the internal URL for Google Analytics website overlay intact.
+          ga("send", {
+            "hitType": "pageview",
+            "page": Drupal.googleanalytics.getPageUrl(this.href),
+            "transport": "beacon"
+          });
+        }
+      }
+      else {
+        if (Drupal.settings.googleanalytics.trackMailto && $(this).is("a[href^='mailto:'],area[href^='mailto:']")) {
+          // Mailto link clicked.
+          ga("send", {
+            "hitType": "event",
+            "eventCategory": "Mails",
+            "eventAction": "Click",
+            "eventLabel": this.href.substring(7),
+            "transport": "beacon"
+          });
+        }
+        else if (Drupal.settings.googleanalytics.trackOutbound && this.href.match(/^\w+:\/\//i)) {
+          if (Drupal.settings.googleanalytics.trackDomainMode !== 2 || (Drupal.settings.googleanalytics.trackDomainMode === 2 && !Drupal.googleanalytics.isCrossDomain(this.hostname, Drupal.settings.googleanalytics.trackCrossDomains))) {
+            // External link clicked / No top-level cross domain clicked.
+            ga("send", {
+              "hitType": "event",
+              "eventCategory": "Outbound links",
+              "eventAction": "Click",
+              "eventLabel": this.href,
+              "transport": "beacon"
+            });
+          }
+        }
+      }
+    });
+  });
+
+  // Track hash changes as unique pageviews, if this option has been enabled.
+  if (Drupal.settings.googleanalytics.trackUrlFragments) {
+    window.onhashchange = function() {
+      ga("send", {
+        "hitType": "pageview",
+        "page": location.pathname + location.search + location.hash
+      });
+    };
+  }
+
+  // Colorbox: This event triggers when the transition has completed and the
+  // newly loaded content has been revealed.
+  if (Drupal.settings.googleanalytics.trackColorbox) {
+    $(document).bind("cbox_complete", function () {
+      var href = $.colorbox.element().attr("href");
+      if (href) {
+        ga("send", {
+          "hitType": "pageview",
+          "page": Drupal.googleanalytics.getPageUrl(href)
+        });
+      }
+    });
+  }
+
+});
+
+/**
+ * Check whether the hostname is part of the cross domains or not.
+ *
+ * @param string hostname
+ *   The hostname of the clicked URL.
+ * @param array crossDomains
+ *   All cross domain hostnames as JS array.
+ *
+ * @return boolean
+ */
+Drupal.googleanalytics.isCrossDomain = function (hostname, crossDomains) {
+  /**
+   * jQuery < 1.6.3 bug: $.inArray crushes IE6 and Chrome if second argument is
+   * `null` or `undefined`, https://bugs.jquery.com/ticket/10076,
+   * https://github.com/jquery/jquery/commit/a839af034db2bd934e4d4fa6758a3fed8de74174
+   *
+   * @todo: Remove/Refactor in D8
+   */
+  if (!crossDomains) {
+    return false;
+  }
+  else {
+    return $.inArray(hostname, crossDomains) > -1 ? true : false;
+  }
+};
+
+/**
+ * Check whether this is a download URL or not.
+ *
+ * @param string url
+ *   The web url to check.
+ *
+ * @return boolean
+ */
+Drupal.googleanalytics.isDownload = function (url) {
+  var isDownload = new RegExp("\\.(" + Drupal.settings.googleanalytics.trackDownloadExtensions + ")([\?#].*)?$", "i");
+  return isDownload.test(url);
+};
+
+/**
+ * Check whether this is an absolute internal URL or not.
+ *
+ * @param string url
+ *   The web url to check.
+ *
+ * @return boolean
+ */
+Drupal.googleanalytics.isInternal = function (url) {
+  var isInternal = new RegExp("^(https?):\/\/" + window.location.host, "i");
+  return isInternal.test(url);
+};
+
+/**
+ * Check whether this is a special URL or not.
+ *
+ * URL types:
+ *  - gotwo.module /go/* links.
+ *
+ * @param string url
+ *   The web url to check.
+ *
+ * @return boolean
+ */
+Drupal.googleanalytics.isInternalSpecial = function (url) {
+  var isInternalSpecial = new RegExp("(\/go\/.*)$", "i");
+  return isInternalSpecial.test(url);
+};
+
+/**
+ * Extract the relative internal URL from an absolute internal URL.
+ *
+ * Examples:
+ * - https://mydomain.com/node/1 -> /node/1
+ * - https://example.com/foo/bar -> https://example.com/foo/bar
+ *
+ * @param string url
+ *   The web url to check.
+ *
+ * @return string
+ *   Internal website URL
+ */
+Drupal.googleanalytics.getPageUrl = function (url) {
+  var extractInternalUrl = new RegExp("^(https?):\/\/" + window.location.host, "i");
+  return url.replace(extractInternalUrl, '');
+};
+
+/**
+ * Extract the download file extension from the URL.
+ *
+ * @param string url
+ *   The web url to check.
+ *
+ * @return string
+ *   The file extension of the passed url. e.g. "zip", "txt"
+ */
+Drupal.googleanalytics.getDownloadExtension = function (url) {
+  var extractDownloadextension = new RegExp("\\.(" + Drupal.settings.googleanalytics.trackDownloadExtensions + ")([\?#].*)?$", "i");
+  var extension = extractDownloadextension.exec(url);
+  return (extension === null) ? '' : extension[1];
+};
+
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/

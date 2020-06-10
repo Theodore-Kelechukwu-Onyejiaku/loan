@@ -1,0 +1,41 @@
+jQuery(document).ready(function() {
+  var $ = jQuery;
+
+  if (typeof ga === 'function') {
+    ga(function(tracker) {
+      Cookies.set('googleClientId', tracker.get('clientId'));
+    });
+  }
+
+  function mosaic_logvisit() {
+    if (typeof ga === 'function') {
+      ga(function(tracker) {
+        var clientId = tracker.get('clientId');
+        var url = '/ajax/mosaic-log-visit?google_client_id=' + encodeURIComponent(clientId)
+            + '&website_page_name=' + encodeURIComponent(window.location.href);
+
+        $.ajax(url, {
+          type: 'POST',
+        })
+      });
+    }
+  }
+
+  var input = '^/' + Drupal.settings.pathPrefix + 'personal-loans/apply/completed*.';
+  var regex = new RegExp(input, 'g');
+
+  if (window.location.pathname.match(regex)) {
+    Cookies.remove('cdl_application_form_visited');
+    mosaic_logvisit();
+  } else if (!$('#cdl-application-form').length) {
+    mosaic_logvisit();
+  } else if ($('#cdl-application-form').hasClass('step-1')) {
+    if (Cookies.get('cdl_application_form_visited') != 1) {
+      Cookies.set('cdl_application_form_visited', 1);
+      mosaic_logvisit();
+    }
+  }
+});
+
+;/*})'"*/
+;/*})'"*/

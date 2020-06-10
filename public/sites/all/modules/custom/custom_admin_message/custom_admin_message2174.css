@@ -1,0 +1,77 @@
+.block-custom-admin-message {
+  position: fixed;
+  bottom: 0px;
+  right: 0px;
+  max-width: 768px;
+  z-index: 1200;
+}
+
+.node-custom-admin-message {
+  position: relative;
+  margin: 15px;
+  padding: 20px;
+  border: 1px solid #FB8484;
+  border-radius: 10px;
+  background-color: #FFF4F4;
+  opacity: 0;
+  transition: opacity 0.8s ease-in;
+}
+
+@media (max-width: 479px) {
+  .node-custom-admin-message {
+    margin: 8px;
+    padding: 8px;
+  }
+}
+
+.close-admin-message {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 21px;
+  height: 21px;
+  cursor: pointer;
+  padding: 5px;
+}
+
+.close-admin-message:before, .close-admin-message:after {
+  position: absolute;
+  left: 10px;
+  content: ' ';
+  height: 14px;
+  width: 2px;
+  background-color: #FB8484;
+}
+
+.close-admin-message:hover:before, .close-admin-message:hover:after {
+  background-color: #f94c4c;
+}
+
+.close-admin-message:before {
+  transform: rotate(45deg);
+}
+
+.close-admin-message:after {
+  transform: rotate(-45deg);
+}
+
+.node-custom-admin-message .fa-stack {
+  float: left;
+  line-height: 42.66px;
+}
+
+.node-custom-admin-message i.fa-circle {
+  color: #FB8484;
+  font-size: 40px;
+}
+
+.node-custom-admin-message i.fa-exclamation {
+  color: white;
+  font-size: 20px;
+}
+
+.node-custom-admin-message .content {
+  float: left;
+  margin-left: 10px;
+  max-width: calc(100% - 55px);
+}

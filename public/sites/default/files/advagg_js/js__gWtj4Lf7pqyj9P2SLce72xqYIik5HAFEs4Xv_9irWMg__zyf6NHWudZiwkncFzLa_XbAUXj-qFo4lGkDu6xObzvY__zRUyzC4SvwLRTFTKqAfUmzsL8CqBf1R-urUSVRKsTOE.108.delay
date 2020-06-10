@@ -1,0 +1,807 @@
+(function ($) {
+  Drupal.behaviors.custom_admin_message = {
+    attach: function (context, settings) {
+      if ($('.node-custom-admin-message').length) {
+        setTimeout(function() {
+          var messages = $('.node-custom-admin-message');
+
+          messages.toArray().forEach(function(message, index, array) {
+            var name = $(message).attr('name');
+            var cookie = Cookies.get(name);
+            if (typeof cookie !== 'undefined') {
+              $(message).hide();
+            }
+
+            $(message).find('.close-admin-message').click(function(e) {
+              $(message).hide();
+              Cookies.set(name, 'disabled');
+            });
+          });
+
+          $(messages).css('opacity', 1);
+        }, 2000);
+      }
+    }
+  };
+}(jQuery));
+
+;/*})'"*/
+;/*})'"*/
+/**
+ * @file
+ * Some basic behaviors and utility functions for Views.
+ */
+(function ($) {
+
+  Drupal.Views = {};
+
+  /**
+   * JQuery UI tabs, Views integration component.
+   */
+  Drupal.behaviors.viewsTabs = {
+    attach: function (context) {
+      if ($.viewsUi && $.viewsUi.tabs) {
+        $('#views-tabset').once('views-processed').viewsTabs({
+          selectedClass: 'active'
+        });
+      }
+
+      $('a.views-remove-link').once('views-processed').click(function(event) {
+        var id = $(this).attr('id').replace('views-remove-link-', '');
+        $('#views-row-' + id).hide();
+        $('#views-removed-' + id).attr('checked', true);
+        event.preventDefault();
+      });
+      /**
+    * Here is to handle display deletion
+    * (checking in the hidden checkbox and hiding out the row).
+    */
+      $('a.display-remove-link')
+        .addClass('display-processed')
+        .click(function() {
+          var id = $(this).attr('id').replace('display-remove-link-', '');
+          $('#display-row-' + id).hide();
+          $('#display-removed-' + id).attr('checked', true);
+          return false;
+        });
+    }
+  };
+
+  /**
+ * Helper function to parse a querystring.
+ */
+  Drupal.Views.parseQueryString = function (query) {
+    var args = {};
+    var pos = query.indexOf('?');
+    if (pos != -1) {
+      query = query.substring(pos + 1);
+    }
+    var pairs = query.split('&');
+    for (var i in pairs) {
+      if (typeof(pairs[i]) == 'string') {
+        var pair = pairs[i].split('=');
+        // Ignore the 'q' path argument, if present.
+        if (pair[0] != 'q' && pair[1]) {
+          args[decodeURIComponent(pair[0].replace(/\+/g, ' '))] = decodeURIComponent(pair[1].replace(/\+/g, ' '));
+        }
+      }
+    }
+    return args;
+  };
+
+  /**
+ * Helper function to return a view's arguments based on a path.
+ */
+  Drupal.Views.parseViewArgs = function (href, viewPath) {
+
+    // Provide language prefix.
+    if (Drupal.settings.pathPrefix) {
+      var viewPath = Drupal.settings.pathPrefix + viewPath;
+    }
+    var returnObj = {};
+    var path = Drupal.Views.getPath(href);
+    // Ensure we have a correct path.
+    if (viewPath && path.substring(0, viewPath.length + 1) == viewPath + '/') {
+      var args = decodeURIComponent(path.substring(viewPath.length + 1, path.length));
+      returnObj.view_args = args;
+      returnObj.view_path = path;
+    }
+    return returnObj;
+  };
+
+  /**
+ * Strip off the protocol plus domain from an href.
+ */
+  Drupal.Views.pathPortion = function (href) {
+    // Remove e.g. http://example.com if present.
+    var protocol = window.location.protocol;
+    if (href.substring(0, protocol.length) == protocol) {
+      // 2 is the length of the '//' that normally follows the protocol.
+      href = href.substring(href.indexOf('/', protocol.length + 2));
+    }
+    return href;
+  };
+
+  /**
+ * Return the Drupal path portion of an href.
+ */
+  Drupal.Views.getPath = function (href) {
+    href = Drupal.Views.pathPortion(href);
+    href = href.substring(Drupal.settings.basePath.length, href.length);
+    // 3 is the length of the '?q=' added to the url without clean urls.
+    if (href.substring(0, 3) == '?q=') {
+      href = href.substring(3, href.length);
+    }
+    var chars = ['#', '?', '&'];
+    for (var i in chars) {
+      if (href.indexOf(chars[i]) > -1) {
+        href = href.substr(0, href.indexOf(chars[i]));
+      }
+    }
+    return href;
+  };
+
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/
+(function ($) {
+
+/**
+ * A progressbar object. Initialized with the given id. Must be inserted into
+ * the DOM afterwards through progressBar.element.
+ *
+ * method is the function which will perform the HTTP request to get the
+ * progress bar state. Either "GET" or "POST".
+ *
+ * e.g. pb = new progressBar('myProgressBar');
+ *      some_element.appendChild(pb.element);
+ */
+Drupal.progressBar = function (id, updateCallback, method, errorCallback) {
+  var pb = this;
+  this.id = id;
+  this.method = method || 'GET';
+  this.updateCallback = updateCallback;
+  this.errorCallback = errorCallback;
+
+  // The WAI-ARIA setting aria-live="polite" will announce changes after users
+  // have completed their current activity and not interrupt the screen reader.
+  this.element = $('<div class="progress" aria-live="polite"></div>').attr('id', id);
+  this.element.html('<div class="bar"><div class="filled"></div></div>' +
+                    '<div class="percentage"></div>' +
+                    '<div class="message">&nbsp;</div>');
+};
+
+/**
+ * Set the percentage and status message for the progressbar.
+ */
+Drupal.progressBar.prototype.setProgress = function (percentage, message) {
+  if (percentage >= 0 && percentage <= 100) {
+    $('div.filled', this.element).css('width', percentage + '%');
+    $('div.percentage', this.element).html(percentage + '%');
+  }
+  $('div.message', this.element).html(message);
+  if (this.updateCallback) {
+    this.updateCallback(percentage, message, this);
+  }
+};
+
+/**
+ * Start monitoring progress via Ajax.
+ */
+Drupal.progressBar.prototype.startMonitoring = function (uri, delay) {
+  this.delay = delay;
+  this.uri = uri;
+  this.sendPing();
+};
+
+/**
+ * Stop monitoring progress via Ajax.
+ */
+Drupal.progressBar.prototype.stopMonitoring = function () {
+  clearTimeout(this.timer);
+  // This allows monitoring to be stopped from within the callback.
+  this.uri = null;
+};
+
+/**
+ * Request progress data from server.
+ */
+Drupal.progressBar.prototype.sendPing = function () {
+  if (this.timer) {
+    clearTimeout(this.timer);
+  }
+  if (this.uri) {
+    var pb = this;
+    // When doing a post request, you need non-null data. Otherwise a
+    // HTTP 411 or HTTP 406 (with Apache mod_security) error may result.
+    $.ajax({
+      type: this.method,
+      url: this.uri,
+      data: '',
+      dataType: 'json',
+      success: function (progress) {
+        // Display errors.
+        if (progress.status == 0) {
+          pb.displayError(progress.data);
+          return;
+        }
+        // Update display.
+        pb.setProgress(progress.percentage, progress.message);
+        // Schedule next timer.
+        pb.timer = setTimeout(function () { pb.sendPing(); }, pb.delay);
+      },
+      error: function (xmlhttp) {
+        pb.displayError(Drupal.ajaxError(xmlhttp, pb.uri));
+      }
+    });
+  }
+};
+
+/**
+ * Display errors on the page.
+ */
+Drupal.progressBar.prototype.displayError = function (string) {
+  var error = $('<div class="messages error"></div>').html(string);
+  $(this.element).before(error).hide();
+
+  if (this.errorCallback) {
+    this.errorCallback(this);
+  }
+};
+
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/
+/**
+ * @file
+ * Handles AJAX fetching of views, including filter submission and response.
+ */
+(function ($) {
+
+  /**
+   * Attaches the AJAX behavior to exposed filter forms and key views links.
+   */
+  Drupal.behaviors.ViewsAjaxView = {};
+  Drupal.behaviors.ViewsAjaxView.attach = function() {
+    if (Drupal.settings && Drupal.settings.views && Drupal.settings.views.ajaxViews) {
+      $.each(Drupal.settings.views.ajaxViews, function(i, settings) {
+        Drupal.views.instances[i] = new Drupal.views.ajaxView(settings);
+      });
+    }
+  };
+
+  Drupal.views = {};
+  Drupal.views.instances = {};
+
+  /**
+   * JavaScript object for a certain view.
+   */
+  Drupal.views.ajaxView = function(settings) {
+    var selector = '.view-dom-id-' + settings.view_dom_id;
+    this.$view = $(selector);
+
+    // Retrieve the path to use for views' ajax.
+    var ajax_path = Drupal.settings.views.ajax_path;
+
+    // If there are multiple views this might've ended up showing up multiple
+    // times.
+    if (ajax_path.constructor.toString().indexOf("Array") != -1) {
+      ajax_path = ajax_path[0];
+    }
+
+    // Check if there are any GET parameters to send to views.
+    var queryString = window.location.search || '';
+    if (queryString !== '') {
+      // Remove the question mark and Drupal path component if any.
+      var queryString = queryString.slice(1).replace(/q=[^&]+&?|&?render=[^&]+/, '');
+      if (queryString !== '') {
+        // If there is a '?' in ajax_path, clean url are on and & should be
+        // used to add parameters.
+        queryString = ((/\?/.test(ajax_path)) ? '&' : '?') + queryString;
+      }
+    }
+
+    this.element_settings = {
+      url: ajax_path + queryString,
+      submit: settings,
+      setClick: true,
+      event: 'click',
+      selector: selector,
+      progress: {
+        type: 'throbber'
+      }
+    };
+
+    this.settings = settings;
+
+    // Add the ajax to exposed forms.
+    this.$exposed_form = $('#views-exposed-form-' + settings.view_name.replace(/_/g, '-') + '-' + settings.view_display_id.replace(/_/g, '-'));
+    this.$exposed_form.once(jQuery.proxy(this.attachExposedFormAjax, this));
+
+    // Store Drupal.ajax objects here for all pager links.
+    this.links = [];
+
+    // Add the ajax to pagers.
+    this.$view
+      .once(jQuery.proxy(this.attachPagerAjax, this));
+
+    // Add a trigger to update this view specifically. In order to trigger a
+    // refresh use the following code.
+    //
+    // @code
+    // jQuery('.view-name').trigger('RefreshView');
+    // @endcode
+    // Add a trigger to update this view specifically.
+    var self_settings = this.element_settings;
+    self_settings.event = 'RefreshView';
+    this.refreshViewAjax = new Drupal.ajax(this.selector, this.$view, self_settings);
+  };
+
+  Drupal.views.ajaxView.prototype.attachExposedFormAjax = function() {
+    var button = $('input[type=submit], button[type=submit], input[type=image]', this.$exposed_form);
+    button = button[0];
+
+    // Call the autocomplete submit before doing AJAX.
+    $(button).click(function () {
+      if (Drupal.autocompleteSubmit) {
+        Drupal.autocompleteSubmit();
+      }
+    });
+
+    this.exposedFormAjax = new Drupal.ajax($(button).attr('id'), button, this.element_settings);
+  };
+
+  /**
+   * Attach the ajax behavior to each link.
+   */
+  Drupal.views.ajaxView.prototype.attachPagerAjax = function() {
+    this.$view.find('ul.pager > li > a, th.views-field a, .attachment .views-summary a')
+      .each(jQuery.proxy(this.attachPagerLinkAjax, this));
+  };
+
+  /**
+   * Attach the ajax behavior to a singe link.
+   */
+  Drupal.views.ajaxView.prototype.attachPagerLinkAjax = function(id, link) {
+    var $link = $(link);
+    // Don't attach to pagers inside nested views.
+    if ($link.closest('.view')[0] !== this.$view[0]) {
+      return;
+    }
+    var viewData = {};
+    var href = $link.attr('href');
+
+    // Provide a default page if none has been set. This must be done
+    // prior to merging with settings to avoid accidentally using the
+    // page landed on instead of page 1.
+    if (typeof(viewData.page) === 'undefined') {
+      viewData.page = 0;
+    }
+
+    // Construct an object using the settings defaults and then overriding
+    // with data specific to the link.
+    $.extend(
+    viewData,
+    this.settings,
+    Drupal.Views.parseQueryString(href),
+    // Extract argument data from the URL.
+    Drupal.Views.parseViewArgs(href, this.settings.view_base_path)
+    );
+
+    // For anchor tags, these will go to the target of the anchor rather
+    // than the usual location.
+    $.extend(viewData, Drupal.Views.parseViewArgs(href, this.settings.view_base_path));
+
+    this.element_settings.submit = viewData;
+    this.pagerAjax = new Drupal.ajax(false, $link, this.element_settings);
+    this.links.push(this.pagerAjax);
+  };
+
+  Drupal.ajax.prototype.commands.viewsScrollTop = function (ajax, response, status) {
+    // Scroll to the top of the view. This will allow users
+    // to browse newly loaded content after e.g. clicking a pager
+    // link.
+    var offset = $(response.selector).offset();
+    // We can't guarantee that the scrollable object should be
+    // the body, as the view could be embedded in something
+    // more complex such as a modal popup. Recurse up the DOM
+    // and scroll the first element that has a non-zero top.
+    var scrollTarget = response.selector;
+    while ($(scrollTarget).scrollTop() == 0 && $(scrollTarget).parent()) {
+      scrollTarget = $(scrollTarget).parent();
+    }
+    // Only scroll upward.
+    if (offset.top - 10 < $(scrollTarget).scrollTop()) {
+      $(scrollTarget).animate({scrollTop: (offset.top - 10)}, 500);
+    }
+  };
+
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/
+/**
+ * @file
+ * JS for Radix.
+ */
+(function ($, Drupal, window, document, undefined) {
+  // Allow dropdown links to be clickable by showing dropdowns on hover/focus.
+  Drupal.behaviors.radix_dropdown = {
+    attach: function(context, setting) {
+      var dropdown_disabled = false;
+
+      // Prevent the dropdown from re-opening if a menu link was focused before
+      // the window was re-focused.
+      $(window).focus(function() {
+        dropdown_disabled = true;
+        setTimeout(function () {
+          dropdown_disabled = false;
+        }, 0);
+      });
+
+      $('.dropdown').once('radix-dropdown', function() {
+        var dropdown = this;
+
+        // Helper function to show the dropdown.
+        function show() {
+          if (!$(dropdown).hasClass('open') && !dropdown_disabled) {
+            $('>[data-toggle="dropdown"]', dropdown).trigger('click.bs.dropdown');
+          }
+        }
+
+        // Helper function to hide the dropdown.
+        function hide() {
+          if ($(dropdown).hasClass('open')) {
+            $('>[data-toggle="dropdown"]', dropdown).trigger('click.bs.dropdown');
+          }
+        }
+
+        // Show dropdown on hover and focus.
+        $(this).on('mouseenter.radix.dropdown', function(e) {
+          show();
+        });
+        $(this).on('mouseleave.radix.dropdown', function() {
+          hide();
+        });
+        $(this).on('focusin.radix.dropdown', function() {
+          show();
+        });
+
+        $(this).on('keydown.radix.dropdown', function(e) {
+          // Prevent up/down arrow from doing anything -- they conflict with
+          // using focus to show the dropdown, and the default Bootstrap keydown
+          // handler will trigger our click handler to visit the link.
+          if (e.keyCode == 38 || e.keyCode == 40) {
+            return false;
+          }
+          // Show/hide dropdown with spacebar.
+          if (e.keyCode == 32) {
+            $('>[data-toggle="dropdown"]', dropdown).trigger('click.bs.dropdown');
+            return false;
+          }
+          // Hide the dropdown with the escape hey.
+          if (e.keyCode == 27) {
+            // Leave focus on the parent after it's hidden.
+            $('>[data-toggle="dropdown"]', dropdown).focus();
+            hide();
+            return false;
+          }
+        });
+
+        // Allow a.dropdown-toggle to be clickable.
+        if ($(this).has('> a.dropdown-toggle')) {
+          $(this).on('click.radix.dropdown', function(e) {
+            var $target = $(e.target);
+            if ($target.parent().get(0) == dropdown && $target.is('a.dropdown-toggle') && $target.attr('href')) {
+              e.preventDefault();
+              window.location.href = $target.attr('href');
+            }
+          });
+        }
+      });
+
+      // Make submenus work.
+      $('.dropdown-submenu').once('radix-dropdown', function() {
+        var dropdown = this,
+            toggle = $(dropdown).children('.dropdown-toggle'),
+            menu = $(dropdown).children('.dropdown-menu');
+
+        function show() {
+          $(dropdown).addClass('open');
+        }
+
+        function hide() {
+          $(dropdown).removeClass('open');
+        }
+
+        $(dropdown)
+          .on('mouseenter.radix.dropdown', show)
+          .on('mouseleave.radix.dropdown', hide)
+          .on('focusin.radix.dropdown', show);
+      });
+
+      // Hide dropdowns when focus is lost.
+      $('body').once('radix-dropdown').on('focusout.radix.dropdown', function(e) {
+        var parent = $(e.target).closest('li.radix-dropdown-processed.open').get(0);
+        if (parent) {
+          // Defer to after all handlers so we can see where focus landed.
+          setTimeout(function () {
+            // Don't do anything if no element is focused - that can only
+            // happen with the mouse and this is meant to close the menu
+            // when the keyboard is used to change focus.
+            if (!document.activeElement || document.activeElement === document.body) {
+              return;
+            }
+            // Hide the parent if it doesn't contain the now focused element
+            // and is still open.
+            if (!parent.contains(document.activeElement) && $(parent).hasClass('open')) {
+              if ($(parent).hasClass('dropdown-submenu')) {
+                $(parent).removeClass('open');
+              }
+              else {
+                $(parent).trigger('click.bs.dropdown');
+              }
+            }
+          }, 0);
+        }
+      });
+
+    }
+  };
+
+  // Bootstrap tooltip.
+  Drupal.behaviors.radix_tooltip = {
+    attach: function(context, setting) {
+      if ($.fn.tooltip) {
+        $("[data-toggle='tooltip']").tooltip();
+      }
+    }
+  };
+
+  // Bootstrap popover.
+  Drupal.behaviors.radix_popover = {
+    attach: function(context, setting) {
+      if ($.fn.popover) {
+        $("[data-toggle='popover']").popover();
+      }
+    }
+  };
+
+  $(document).ready(function() {
+    // Show first tab by default.
+    // Ignore the "primary" tabs on the node edit page.
+    if ($.fn.tab) {
+      var tabs = $('.nav-tabs').not('.primary');
+      tabs.children('li').first().find('a').tab('show');
+
+      if (hash = window.location.hash) {
+        $('.nav-tabs > li > a[href$="' + hash + '"]').tab('show');
+      }
+    }
+  });
+})(jQuery, Drupal, this, this.document);
+
+;/*})'"*/
+;/*})'"*/
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+jQuery(document).ready(function() {
+  var $ = jQuery;
+
+  $('.bg-image, .bg-color').get().forEach(function(element) {
+    var $bg_image = $(element);
+    var $bg_content = $bg_image.find('.bg-content .panel-pane').detach();
+    var $row = $bg_image.parents('.row');
+    $bg_image = $bg_image.detach();
+    $bg_image.find('.bg-content').remove();
+    $row.wrapInner('<div class="bg-content"></div>');
+    $row.wrapInner($bg_image);
+    $bg_content.get().forEach(function(element) {
+      $row.find('.panels-bootstrap-column').first().find('.panels-bootstrap-region').first().append(element);
+    });
+  });
+
+  $('#form-application-code-button').click(function(e) {
+    $(this).hide();
+  });
+
+  if ($('#company-map').length) {
+    xhr = new XMLHttpRequest();
+    xhr.open("GET","/sites/all/themes/cdl/assets/images/svg/company-map.svg",false);
+    xhr.send("");
+    $('#company-map').append(xhr.response);
+    $('#company-map .clickable').click(function(e) {
+      var location = $(this).attr('class').split(' ')[1];
+      window.location.href = '/' + Drupal.settings.pathPrefix + "company/locations/" + location;
+    });
+  }
+
+  $('[data-toggle="tooltip"]').tooltip();
+
+  if (typeof ga === 'function') {
+    $('video').toArray().forEach(function(element) {
+      element.addEventListener('play', function(e) {
+        var name = $(this).attr('name');
+        ga('send', 'event', 'Testimonial Videos', 'play', name);
+      });
+    });
+  }
+
+  var utmList = getUtmInUrl(window.location.search);
+  setUtmInCookie(utmList);
+});
+
+function getUtmInUrl(qs) {
+    qs = qs.split('+').join(' ');
+    var params = {},
+        tokens,
+        re = /[?&]?([^=]+)=([^&]*)/g;
+
+    while (tokens = re.exec(qs)) {
+        params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
+    }
+
+    return params;
+}
+
+
+function setUtmInCookie(utmList) {
+	Object.keys(utmList).forEach(function(key){
+		if (key.startsWith('utm') 
+				|| key.startsWith('campaign')
+				|| key.startsWith('ad_')) {
+			eraseCookie(key);
+			setCookie(key, utmList[key], 1);
+		}
+	})
+}
+function setCookie(name,value,days) {
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 *1000));
+        var expires = "; expires=" + date.toGMTString();
+    } else {
+        var expires = "";
+    }
+    document.cookie = name + "=" + value + expires + "; path=/";
+}
+
+function readCookie(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for(var i=0;i < ca.length;i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') {
+            c = c.substring(1,c.length);
+        }
+        if (c.indexOf(nameEQ) == 0) {
+            return c.substring(nameEQ.length,c.length);
+        }
+    }
+    return null;
+}
+
+function eraseCookie(name) {
+    setCookie(name,"",-1);
+}
+
+},{}]},{},[1]);
+
+//# sourceMappingURL=cdl.script.min.js.map
+
+;/*})'"*/
+;/*})'"*/
+(function ($) {
+
+/**
+ * A progressbar object. Initialized with the given id. Must be inserted into
+ * the DOM afterwards through progressBar.element.
+ *
+ * method is the function which will perform the HTTP request to get the
+ * progress bar state. Either "GET" or "POST".
+ *
+ * e.g. pb = new progressBar('myProgressBar');
+ *      some_element.appendChild(pb.element);
+ */
+Drupal.progressBar = function (id, updateCallback, method, errorCallback) {
+  var pb = this;
+  this.id = id;
+  this.method = method || 'GET';
+  this.updateCallback = updateCallback;
+  this.errorCallback = errorCallback;
+
+  // The WAI-ARIA setting aria-live="polite" will announce changes after users
+  // have completed their current activity and not interrupt the screen reader.
+  this.element = $('<div class="progress-wrapper" aria-live="polite"></div>');
+  this.element.html('<div id ="' + id + '" class="progress progress-striped active">' +
+                    '<div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">' +
+                    '<div class="percentage sr-only"></div>' +
+                    '</div></div>' +
+                    '</div><div class="percentage pull-right"></div>' +
+                    '<div class="message">&nbsp;</div>');
+};
+
+/**
+ * Set the percentage and status message for the progressbar.
+ */
+Drupal.progressBar.prototype.setProgress = function (percentage, message) {
+  if (percentage >= 0 && percentage <= 100) {
+    $('div.progress-bar', this.element).css('width', percentage + '%');
+    $('div.progress-bar', this.element).attr('aria-valuenow', percentage);
+    $('div.percentage', this.element).html(percentage + '%');
+  }
+  $('div.message', this.element).html(message);
+  if (this.updateCallback) {
+    this.updateCallback(percentage, message, this);
+  }
+};
+
+/**
+ * Start monitoring progress via Ajax.
+ */
+Drupal.progressBar.prototype.startMonitoring = function (uri, delay) {
+  this.delay = delay;
+  this.uri = uri;
+  this.sendPing();
+};
+
+/**
+ * Stop monitoring progress via Ajax.
+ */
+Drupal.progressBar.prototype.stopMonitoring = function () {
+  clearTimeout(this.timer);
+  // This allows monitoring to be stopped from within the callback.
+  this.uri = null;
+};
+
+/**
+ * Request progress data from server.
+ */
+Drupal.progressBar.prototype.sendPing = function () {
+  if (this.timer) {
+    clearTimeout(this.timer);
+  }
+  if (this.uri) {
+    var pb = this;
+    // When doing a post request, you need non-null data. Otherwise a
+    // HTTP 411 or HTTP 406 (with Apache mod_security) error may result.
+    $.ajax({
+      type: this.method,
+      url: this.uri,
+      data: '',
+      dataType: 'json',
+      success: function (progress) {
+        // Display errors.
+        if (progress.status == 0) {
+          pb.displayError(progress.data);
+          return;
+        }
+        // Update display.
+        pb.setProgress(progress.percentage, progress.message);
+        // Schedule next timer.
+        pb.timer = setTimeout(function () { pb.sendPing(); }, pb.delay);
+      },
+      error: function (xmlhttp) {
+        pb.displayError(Drupal.ajaxError(xmlhttp, pb.uri));
+      }
+    });
+  }
+};
+
+/**
+ * Display errors on the page.
+ */
+Drupal.progressBar.prototype.displayError = function (string) {
+  var error = $('<div class="alert alert-block alert-danger"><a class="close" data-dismiss="alert" href="#">&times;</a><h4>Error message</h4></div>').append(string);
+  $(this.element).before(error).hide();
+
+  if (this.errorCallback) {
+    this.errorCallback(this);
+  }
+};
+
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/

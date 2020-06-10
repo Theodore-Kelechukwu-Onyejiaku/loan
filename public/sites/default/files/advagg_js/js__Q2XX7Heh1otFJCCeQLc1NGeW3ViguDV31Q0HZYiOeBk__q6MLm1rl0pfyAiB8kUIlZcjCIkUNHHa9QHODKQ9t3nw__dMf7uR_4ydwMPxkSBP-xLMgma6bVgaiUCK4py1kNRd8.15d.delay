@@ -1,0 +1,1081 @@
+// Avoid `console` errors in browsers that lack a console. e.g. IE9
+(function() {
+  var method;
+  var noop = function () {};
+  var methods = [
+    'assert', 'clear', 'count', 'debug', 'dir', 'dirxml', 'error',
+    'exception', 'group', 'groupCollapsed', 'groupEnd', 'info', 'log',
+    'markTimeline', 'profile', 'profileEnd', 'table', 'time', 'timeEnd',
+    'timeline', 'timelineEnd', 'timeStamp', 'trace', 'warn'
+  ];
+  var length = methods.length;
+  var console = (window.console = window.console || {});
+
+  while (length--) {
+    method = methods[length];
+
+    // Only stub undefined methods.
+    if (!console[method]) {
+      console[method] = noop;
+    }
+  }
+}());
+
+(function($) {
+  Drupal.behaviors.cdl_blog_menu = {
+    attach: function(context, settings) {
+      $(document).ready(function(){
+	var module_id = "nb-menu";
+	// Page view for AJAX search requests
+	var search_url = Drupal.settings.basePath + Drupal.settings.pathPrefix + 'cdl-blog-search';
+	var pathname = window.location.pathname;
+
+	$.timeago.settings.allowFuture = true;
+
+	// Initialize dotdotdot and timeago for #latest-news and #most-popular
+  $("h4.ellipsis").dotdotdot({
+	  watch: "window",
+	});
+  $("p.ellipsis").dotdotdot({
+	  watch: "window",
+	  after: "a.readmore"
+	});
+	$("time.timeago").timeago();
+
+	// Utility function used as a shorcut
+	function isHomePage() {
+	  return (window.location.pathname === Drupal.settings.basePath + Drupal.settings.pathPrefix + 'blog');
+	}
+
+	// Utility function used as a shorcut
+	function id(id) {
+	  return '#' + module_id + '_' + id;
+	}
+
+	// Utility function used as a shorcut
+	function c(c) {
+	  return '.' + module_id + '_' + c;
+	}
+
+	// Utility function used as a shorcut
+	function isCheckbox(elem) {
+	  return $(elem).is('input[type=checkbox]');
+	}
+
+	// Utility function used as a shorcut
+	function isSelect(elem) {
+	  return $(elem).is('select');
+	}
+
+	// Utility function used as a shorcut
+	function isTopic(elem) {
+	  return $(elem).is('[id*=_topic]');
+	}
+
+	// Utility function used as a shorcut
+	function isSearch(elem) {
+	  return $(elem).is('input[type=search]');
+	}
+
+	// Utility function used as a shorcut
+	function getName(elem) {
+	  return $(elem).attr('name');
+	}
+
+	// Utility function used as a shorcut
+	function getVal(elem) {
+	  if (isCheckbox(elem)) {
+	    return $(elem).is(':checked');
+	  } else if (isSelect(elem) || isSearch(elem)) {
+	    return $(elem).val();
+	  }
+
+	  return null;
+	}
+
+	// Utility function used as a shorcut
+	// Topic checkboxes have a value attribute
+	// corresponding to their taxonomy ID
+	function getTopicVal(elem) {
+	  if (isTopic(elem)) {
+	    return $(elem).val();
+	  }
+	  return null;
+	}
+
+	// Utility function used as a shorcut
+	// Useful to know if a filter is at its
+	// default state
+	function isNull(elem) {
+	  if (isCheckbox(elem)) {
+	    return (!getVal(elem));
+	  } else if (isSelect(elem)) {
+	    switch (getName(elem)) {
+	    case 'product':
+	      return (getVal(elem) == 'all');
+	    case 'country':
+	      return (getVal(elem) == 'world');
+	    case 'archive':
+	      return (getVal(elem) == 'current');
+	    }
+	  } else if (isSearch(elem)) {
+	    return ($.trim(getVal(elem)).length == 0);
+	  }
+	  return null;
+	}
+
+	// Utility function
+	// Test if a session type is available
+	// in the browser
+	function storageAvailable(type) {
+	  try {
+	    var storage = window[type],
+		x = '__storage_test__';
+	    storage.setItem(x, x);
+	    storage.removeItem(x);
+	    return true;
+	  }
+	  catch(e) {
+	    return false;
+	  }
+	}
+
+	// Utility function
+	// Test if a cookies are availables
+	// in the browser
+	function cookiesEnabled() {
+	  return $.cookie('check', 'valid', { expires: 1 }) && $.cookie('check') == 'valid';
+	}
+
+	// Utility function
+	// Return the decoded value of a named parameter
+	// present in the url query
+	function getParameter(theParameter) {
+	  var params = window.location.search.substr(1).split('&');
+
+	  for (var i = 0; i < params.length; i++) {
+	    var p=params[i].split('=');
+	    if (p[0] == theParameter) {
+	      return decodeURIComponent(p[1]);
+	    }
+	  }
+	  return false;
+	}
+
+	// Utility function
+	// Most robust solution to return the document height
+	function getDocHeight() {
+	  var D = document;
+	  return Math.max(
+	    D.body.scrollHeight, D.documentElement.scrollHeight,
+	    D.body.offsetHeight, D.documentElement.offsetHeight,
+	    D.body.clientHeight, D.documentElement.clientHeight
+	  );
+	}
+
+	/*
+	 * Query Class
+	 *
+	 * Manage the filters behavior in the menu.
+	 *
+	 * Initializes filters data from localStorage -> cookies -> url
+	 * If localStorage is not available, initializes data from cookies.
+	 * If cookies are not availables, initializes data from url parameters.
+	 * If no url query parameters are present, does not initializes filters
+	 * This step is necessary because the user is redirected to the blog Home Page
+	 * when he uses the filters from a Blog Entry.
+	 *
+	 * Has a function to convert filters in url parameters, used to fetch data from the server
+	 * in AJAX requests.
+	 *
+	 * Two objects of this class are instanciated. We can differenciate them
+	 * by their names:
+	 *
+	 * The 'currentQuery':
+	 * Represents the current state of filters in the menu.
+	 *
+	 * The 'pageQuery':
+	 * Used for the pagination, it stores the state of the currentQuery
+	 * when the Page object fetch its first results. This way users can alter
+	 * filters without altering the results printed to the page.
+	 *
+	 * TODO:
+	 * Refactor class name to "Filters".
+	 * Store filters data in an array instead of properties
+	 */
+	function Query(name) {
+	  var query = this;
+
+	  this.initElems = function() {
+	    $(id('filters input, ')
+	      + id('filters select, ')
+	      + id('expand_search input')).each(function(index, elem) {
+		query[getName(elem)] = {
+		  'elem': elem,
+		};
+	      });
+	  }
+
+	  this.localStorageInitElem = function(elem) {
+	    if (getName(elem) === 'search' && this.name === 'currentQuery') {
+	      $(elem).val(localStorage[getName(elem)]);
+	      search.open();
+	      $(id('expand')).hide();
+	    }
+	    if (isCheckbox(elem)) {
+	      if (localStorage[getName(elem)] === 'true') {
+		$(elem).prop('checked', true);
+	      }
+	    } else if (isSelect(elem) && $(elem).find('option[value=' + localStorage[getName(elem)] + ']').length > 0) {
+	      $(elem).val(localStorage[getName(elem)]);
+	    }
+	  }
+
+	  this.cookiesInitElem = function(elem, cookie) {
+	    if (getName(elem) === 'search' && this.name === 'currentQuery') {
+	      $(elem).val(cookie);
+	      search.open();
+	      $(id('expand')).hide();
+	    }
+	    if (isCheckbox(elem)) {
+	      if (cookie === 'true') {
+		$(elem).prop('checked', true);
+	      }
+	    } else if (isSelect(elem) && $(elem).find('option[value=' + cookie + ']').length > 0) {
+	      $(elem).val(cookie);
+	    }
+	  }
+
+	  this.urlInitElem = function(elem, param) {
+	    if (getName(elem) === 'search' && this.name == 'currentQuery') {
+	      $(elem).val(param);
+	      search.open();
+	      $(id('expand')).hide();
+	    }
+	    if (isCheckbox(elem)) {
+	      if (param === 'true') {
+		$(elem).prop('checked', true);
+	      }
+	    } else if (isSelect(elem) && $(elem).find('option[value=' + param + ']').length > 0) {
+	      $(elem).val(param);
+	    }
+	  }
+
+	  this.init = function() {
+	    this.initElems();
+
+	    $(id('filters input, ')
+	      + id('filters select, ')
+	      + id('expand_search input')).each(function(index, elem) {
+		if (query.storageType != null) {
+		  switch (query.storageType) {
+		  case 'localStorage':
+		    if (localStorage[getName(elem)] != undefined
+			&& localStorage[getName(elem)].length) {
+		      query.localStorageInitElem(elem);
+		    }
+		    break;
+		  case 'cookies':
+		    var cookie = $.cookie(getName(elem));
+		    if (cookie && cookie.length) {
+		      query.cookiesInitElem(elem, cookie);
+		    }
+		    break;
+		  case 'url':
+		    var param = getParameter(getName(elem));
+		    if (param) {
+		      query.urlInitElem(elem, param);
+		    }
+		    break;
+		  }
+		}
+		query.update(elem);
+	      });
+	  }
+
+	  this.log = function() {
+	    for (var property in this) {
+	      if (this.hasOwnProperty(property)) {
+		if (this[property].elem != undefined) {
+		  console.log(property + ': ' + this[property].val);
+		}
+	      }
+	    }
+	  }
+
+	  // Update all filters
+	  this.update = function() {
+	    for (var property in this) {
+	      if (this.hasOwnProperty(property)) {
+		if (this[property].elem != undefined) {
+		  this.update(this[property].elem);
+		}
+	      }
+	    }
+	  }
+
+	  // Update a filter value
+	  this.update = function(elem) {
+	    var filter = this[getName(elem)];
+
+	    switch (getName(elem)) {
+	    case 'most-recent':
+	      if (getVal(elem)) {
+		$(this['popular'].elem).prop('checked', false);
+		$(this['popular'].elem).attr('disabled', 'disabled');
+		this['popular'].val = false;
+	      } else {
+		$(this['popular'].elem).removeAttr('disabled');
+	      }
+	      break;
+	    case 'popular':
+	      if (getVal(elem)) {
+		$(this['most-recent'].elem).prop('checked', false);
+		$(this['most-recent'].elem).attr('disabled', '');
+		this['most-recent'].val = false;
+	      } else {
+		$(this['most-recent'].elem).removeAttr('disabled');
+	      }
+	      break;
+	    case 'for-provider':
+	      if (typeof this['for-patient'] != 'undefined') {
+		if (getVal(elem)) {
+		  $(this['for-patient'].elem).prop('checked', false);
+		  $(this['for-patient'].elem).attr('disabled', '');
+		  this['for-patient'].val = false;
+		} else {
+		  $(this['for-patient'].elem).removeAttr('disabled');
+		}
+	      }
+	      break;
+	    case 'for-patient':
+	      if (typeof this['for-provider'] != 'undefined') {
+		if (getVal(elem)) {
+		  $(this['for-provider'].elem).prop('checked', false);
+		  $(this['for-provider'].elem).attr('disabled', '');
+		  this['for-provider'].val = false;
+		} else {
+		  $(this['for-provider'].elem).removeAttr('disabled');
+		}
+	      }
+	      break;
+	    }
+	    this[getName(elem)].val = getVal(elem);
+	  }
+
+	  this.compare = function(query) {
+	    for (var property in this) {
+	      if (this.hasOwnProperty(property)) {
+		if (this[property].elem != undefined) {
+		  if (this[property].val != query[property].val) {
+		    return false;
+		  }
+		}
+	      }
+	    }
+	    return true;
+	  }
+
+	  this.copy = function(name) {
+	    var copy = new Query(name);
+
+	    for (var property in this) {
+	      if (this.hasOwnProperty(property)) {
+		if (this[property].elem != undefined) {
+		  copy[property] = {
+		    'elem': this[property].elem,
+		    'val': this[property].val
+		  };
+		}
+	      }
+	    }
+	    return copy;
+	  }
+
+	  // Select All / Deselect All
+	  this.select = function(select) {
+	    for (var property in this) {
+	      if (this.hasOwnProperty(property)) {
+		if (this[property].elem != undefined) {
+		  if (isCheckbox(this[property].elem)) {
+		    if (select) {
+		      if (typeof $(this[property].elem).attr('disabled') == 'undefined')  {
+			$(this[property].elem).prop("checked", true);
+		      }
+		    } else {
+		      $(this[property].elem).prop("checked", false);
+		    }
+		    this.update($(this[property].elem));
+		  }
+		}
+	      }
+	    }
+	  }
+
+
+	  // Reset all filters to default.
+	  this.reset = function() {
+	    // Deselect All
+	    this.select(false);
+
+	    $(this['search'].elem).val('');
+	    this.update($(this['search'].elem));
+
+	    // $(this['product'].elem).val('all');
+	    // this.update($(this['product'].elem));
+
+	    // $(this['country'].elem).val('world');
+	    // this.update($(this['country'].elem));
+
+	    $(this['archive'].elem).val('current');
+	    this.update($(this['archive'].elem));
+	  }
+
+	  /*
+	   * Store filter values.
+	   *
+	   * For the url storage mode:
+	   * Store the filters value in the current url and
+	   * in all links to Blog Entries
+	   */
+	  this.store = function() {
+	    if (this.name == 'currentQuery') {
+	      if (this.storageType == 'url') {
+		var query = [];
+
+	      }
+	      for (var property in this) {
+		if (this.hasOwnProperty(property)) {
+		  if (this[property].elem != undefined &&
+		      this[property].val != undefined) {
+		    var value = (typeof this[property].val != "string")
+			? this[property].val.toString()
+			: this[property].val;
+		    switch (this.storageType) {
+		    case 'localStorage':
+		      localStorage.setItem(property, value);
+		      break;
+		    case 'cookies':
+		      $.cookie(property, value);
+		      break;
+		    case 'url':
+		      if (!isNull(this[property].elem) && (property != 'search' || search.isOpen)) {
+			query.push(property + '=' + encodeURIComponent(value));
+		      }
+		      break;
+		    }
+		    if (property == 'search' && !search.isOpen) {
+		      switch (this.storageType) {
+		      case 'localStorage':
+			if (localStorage['search'] != undefined) {
+			  localStorage.removeItem('search');
+			}
+			break;
+		      case 'cookies':
+			if ($.cookie('search')) {
+			  $.removeCookie('search');
+			}
+			break;
+		      }
+		    }
+		  }
+		}
+	      }
+	      if (this.storageType == 'url') {
+		var queryParameters = '';
+
+		query.forEach(function(param, index, array) {
+		  if (index) {
+		    queryParameters += '&';
+		  }
+		  queryParameters += param;
+		});
+
+		if (!query.length) {
+		  window.history.replaceState('', document.title, pathname);
+		} else {
+		  window.history.replaceState('', document.title, pathname + '?' + queryParameters);
+		}
+
+		$('#most-popular a, a.readmore, #post-navigation a, #related-stories a').each(function(index, elem) {
+		  var url = $(elem).attr('href');
+		  var i = url.indexOf('?');
+
+		  if (i != -1) {
+		    url = url.substr(0, i);
+		  }
+
+		  if (!queryParameters.length) {
+		    $(elem).attr('href', url);
+		  } else {
+		    $(elem).attr('href', url + '?' + queryParameters);
+		  }
+		});
+	      }
+	    }
+	  }
+
+	  /*
+	   * Convert filters in url parameters, used to fetch data from the server
+	   * in AJAX requests.
+	   */
+	  this.url = function(pageNumber) {
+	    currentQuery.store();
+	    var args = {
+	      'sort': null,
+	      'search': 'all',
+	      'taxonomy': [],
+	      'archived': 0,
+	      'date_min': null,
+	      'date_max': null,
+	      'page': '?page=' + pageNumber.toString()
+	    };
+
+	    for (var property in this) {
+	      if (this.hasOwnProperty(property)) {
+		if (this[property].elem != undefined) {
+		  if (isTopic(this[property].elem) && this[property].val == true) {
+		    args.taxonomy.push(getTopicVal(this[property].elem));
+		  } else if (isCheckbox(this[property].elem) && this[property].val == true) {
+		    args.sort = property;
+		  } else if (isSelect(this[property].elem)) {
+		    if (property == 'archive') {
+		      var date_min;
+		      var date_max;
+
+		      if (this[property].val != 'current') {
+			date_min = new Date(this[property].val).getTime();
+			date_max = new Date(this[property].val + '-12-31').getTime();
+
+			args.archived = 1;
+			args.date_min = (date_min / 1000).toString();
+			args.date_max = (date_max / 1000).toString();
+		      }
+
+		    } else if (this[property].val != 'world' && this[property].val != 'all' && this[property].val != undefined) {
+		      args.taxonomy.push(this[property].val);
+		    }
+		  } else if (search.isOpen && isSearch(this[property].elem)
+			     && $.trim(this[property].val).length) {
+		    args.search = encodeURIComponent($.trim(this[property].val));
+		  }
+		}
+	      }
+	    }
+
+	    var url = search_url + (args.sort === 'popular' ? '-popular' : '');
+
+	    url = url + '/' + args.search;
+
+	    if (args.taxonomy.length) {
+	      url = url + '/';
+	      args.taxonomy.forEach(function(item, index, array) {
+		if (index != 0) {
+		  url = url + '+';
+		}
+		url = url + item.toString();
+	      });
+	    } else {
+	      url = url + '/' + 'all';
+	    }
+
+	    url = url + '/' + args.archived.toString();
+
+	    if (args.date_min != null && args.date_max != null) {
+	      url = url + '/' + args.date_min + '/' + args.date_max;
+	    }
+
+	    url = url + args.page;
+
+	    return encodeURI(url);
+	  }
+
+	  if (name == 'currentQuery') {
+            if (window.location.search.substr(1)) {
+	      this.storageType = 'url';
+	    } else if (storageAvailable('localStorage')) {
+	      this.storageType = 'localStorage';
+	    } else if (cookiesEnabled()) {
+	      this.storageType = 'cookies';
+	    } else {
+	      this.storageType = 'url';
+            }
+	  }
+
+	  this.name = name;
+	  this.init();
+	}
+
+	function Grid(parent) {
+	  var grid = this;
+
+	  this.wrap = function(html) {
+	    return '<div class="grid-item thumbnail">' + html + '</div>';
+	  }
+
+	  this.add = function(html) {
+	    var item = $(this.wrap(html));
+
+	    this.grid.append(item);
+
+      $(".ellipsis-title").dotdotdot({
+    	  watch: "window",
+    	});
+	    item.find(".ellipsis").dotdotdot({
+	      watch: "window",
+	      after: "a.readmore"
+	    });
+	    item.find("time.timeago").timeago();
+
+	    this.grid.imagesLoaded(function() {
+	      grid.grid.masonry('appended', item)
+		.masonry('layout');
+	    });
+	  }
+
+	  this.grid = $('#grid');
+	  this.grid.masonry({
+	    columnWidth: '.grid-sizer',
+	    gutter: '.gutter-sizer',
+	    itemSelector: '.grid-item',
+	    percentPosition: true
+	  });
+	}
+
+	function Page() {
+	  var page = this;
+
+	  this.send = function(options) {
+	    function send(options) {
+	      if (options['show'] === false) {
+		if (options['n'] == 0) {
+		  $(id('results-number i')).show();
+		  $(id('results-number span')).hide();
+		}
+	      } else {
+		if (options['page'] == 0) {
+		  pageQuery = currentQuery.copy('pageQuery');
+		}
+		if (!isHomePage()) {
+		  if (currentQuery.storageType == 'url') {
+		    window.location.href = Drupal.settings.basePath + Drupal.settings.pathPrefix + 'blog' + window.location.search;
+		  } else {
+		    window.location.href = Drupal.settings.basePath + Drupal.settings.pathPrefix + 'blog';
+		  }
+		  page.waitResponse = false;
+		  return ;
+		} else {
+		  if (options['n'] == 0) {
+		    $('#loading').show();
+		    $(id('expand')).hide();
+		  }
+		}
+	      }
+
+              $.ajax(options['url'], {
+		type: "GET",
+		dataType: "json"
+	      }).done(function(data) {
+		page.print(data, options['show']);
+		page.waitResponse = false;
+		if (page.queue.length != 0) {
+		  page.send(page.queue.shift());
+		}
+	      }).error(function(jqXHR, textStatus, errorThrown) {
+		options['n'] += 1;
+		timeoutID = window.setTimeout(send, 500, options);
+	      });
+	    }
+
+	    options['n'] = 0;
+	    options['page'] = options['url'].indexOf('page=0') != -1 ? 0 : -1;
+	    if (this.waitResponse == true) {
+	      this.queue.push(options);
+	    } else {
+	      this.waitResponse = true;
+	      send(options);
+	    }
+	  }
+
+	  this.postToHTML = function(post) {
+	    var html = '';
+
+	    html += '<div class="thumbnail-image"><a href="' + post.path + '"><img src="' + post.featured_image + '">';
+
+	    html += '<p class="primary-topics" style="background-color: #' + post.color + '">' +
+	      post.main_topic.toUpperCase() // + ' ' + post.secondary_topic.toUpperCase()
+	      +
+	      '<i class="fa ' + post.icon + ' fa-2x" aria-hidden="true"></i>' +
+	      '</p></a></div>';
+
+	    html += '<div class="caption">' +
+	      '<a href="' + post.path + '" ><h4 class="ellipsis">' + post.title + '</h4></a>' +
+	      '<p class="ellipsis">' + post.summary + ' ' +
+	      '<a href="' + post.path + '" class="readmore">' + Drupal.t('Read more') + '</a>' + '</p>' +
+	      '<time class="timeago" datetime="' + post.publish_date + '"></time>' +
+              '<p class="reading-time">' + post.reading_time + '</p>'
+	      '</div>';
+
+	    return html;
+	  }
+
+	  this.print = function(data, show) {
+	    $(id('results-number span')).html(data['total']);
+	    $(id('results-number i')).hide();
+	    $(id('results-number span')).css('display', 'inline-block');
+	    if (show === true) {
+	      $('#loading').hide();
+	      this.currentPage = data['current_page'];
+	      if (this.currentPage == 0) {
+		this.postsNumber = 0;
+		this.total = data['total'];
+
+		$('#post-listing .top-post').empty();
+
+		this.grid.grid.masonry('remove', this.grid.grid.masonry('getItemElements'))
+		  .masonry('layout');
+		if (this.total != 0) {
+		  $('#post-listing').show();
+		  $('#no-results').hide();
+		} else {
+		  $('#post-listing').hide();
+		  $('#no-results').show();
+		}
+	      }
+
+	      data['posts'].forEach(function(post, index, array) {
+		// if (page.currentPage == 0 && index == 0) {
+		//   var top_post = $('#post-listing .top-post').append(page.postToHTML(post.post));
+
+		//   top_post.find(".ellipsis").dotdotdot({
+		//     watch: "window",
+		//     after: "a.readmore"
+		//   });
+		//   top_post.find("time.timeago").timeago();
+		// }
+                // else {
+		  page.grid.add(page.postToHTML(post.post));
+		// }
+	      });
+
+	      this.postsNumber += data['posts'].length;
+	      if (this.postsNumber < this.total) {
+		this.stopScroll = false;
+	      }
+	    }
+	  }
+
+	  this.queue = [];
+	  this.waitResponse = false;
+	  this.stopScroll = true;
+	  this.currentPage = 0;
+	  this.postsNumber = 0;
+	  this.total = 0;
+	  this.grid = new Grid('#post-listing');
+	}
+
+	function Search(expand) {
+	  var search = this;
+
+	  this.open = function() {
+	    if (!this.isOpen) {
+	      this.expand.show();
+	      this.isOpen = true;
+	      this.focus(true);
+	    }
+	  }
+
+	  this.focus = function(focus) {
+	    if (this.isOpen) {
+	      if (focus) {
+		if (!this.isFocus) {
+		  this.input.focus();
+		  this.isFocus = true;
+		}
+	      } else {
+		if (this.isFocus) {
+		  this.input.blur();
+		  this.isFocus = false;
+		}
+	      }
+	    }
+	  }
+
+	  this.close = function() {
+	    if (this.isOpen) {
+	      this.focus(false);
+	      this.expand.hide();
+	      this.isOpen = false;
+	    }
+	  }
+
+	  this.expand = expand;
+	  this.input = $(this.expand.find('input'));
+	  this.isOpen = false;
+	  this.isFocus = false;
+	  this.timeoutID = -1;
+	}
+
+	var search = new Search($(id('expand_search')));
+	var page = new Page();
+	var currentQuery = new Query('currentQuery');
+	var pageQuery = new Query('pageQuery');
+	var expand = $(id('expand'));
+
+	if (isHomePage()) {
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': true
+	  });
+	} else {
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': false
+	  });
+	}
+
+	$(id('item_filter')).click(function(e) {
+	  if (expand.css('display') == 'none') {
+	    expand.show();
+	    if (search.isOpen) {
+	      search.focus(true);
+	    }
+	  } else {
+	    if (search.isOpen) {
+	      search.focus(false);
+	    }
+	    expand.hide();
+	  }
+	});
+
+	$(id('item_search')).click(function(e) {
+	  if (expand.css('display') == 'none') {
+	    expand.show();
+	    if (search.isOpen) {
+	      search.focus(true);
+	    } else {
+	      search.open();
+	      search.focus(true);
+	    }
+	  } else {
+	    if (!search.isOpen) {
+	      search.open();
+	      search.focus(true);
+	      page.send({
+		'url': currentQuery.url(0),
+		'show': false
+	      });
+	    } else {
+	      search.focus(false);
+	      search.close();
+	      page.send({
+		'url': currentQuery.url(0),
+		'show': false
+	      });
+	    }
+	  }
+	});
+
+	$('[class="' + module_id + '_item-link' + '"]').click(function(e) {
+	  var checkbox = $('[name="' + $(this).attr('id').substring('nb-menu_item_'.length) + '"]')
+
+	  currentQuery.reset();
+	  $(checkbox).prop("checked", true);
+	  currentQuery.update(checkbox);
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': true
+	  });
+	});
+
+	$(id('expand_search input')).keyup(function(e) {
+	  if (e.keyCode == 13) {
+	    page.send({
+	      'url': currentQuery.url(0),
+	      'show': true
+	    });
+	  } else {
+	    currentQuery.update(this);
+	    if (search.timeoutID != -1) {
+	      window.clearTimeout(search.timeoutID);
+	    }
+	    search.timeoutID = window.setTimeout(function() {
+	      page.send({
+		'url': currentQuery.url(0),
+		'show': false
+	      });
+	    }, 500);
+	  }
+	});
+
+	$(id('filters input[type=checkbox], ') + id('filters select')).change(function(e) {
+	  currentQuery.update(this);
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': false
+	  });
+	});
+
+	$(c('filter-only')).click(function(e) {
+	  var checkbox = $(this).parent().find('input[type=checkbox]');
+
+	  currentQuery.select(false);
+	  $(checkbox).prop("checked", true);
+	  currentQuery.update(checkbox);
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': false
+	  });
+	});
+
+	$(c('filter-arrow')).click(function(e) {
+	  var checkbox = $(this).parent().find('input[type=checkbox]');
+
+	  currentQuery.select(false);
+	  $(checkbox).prop("checked", true);
+	  currentQuery.update(checkbox);
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': true
+	  });
+	});
+
+	$(id('select-all')).click(function(e) {
+	  currentQuery.select(true);
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': false
+	  });
+	});
+
+	$(id('deselect-all')).click(function(e) {
+	  currentQuery.select(false);
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': false
+	  });
+	});
+
+	$(id('reset')).click(function(e) {
+	  currentQuery.reset();
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': false
+	  });
+	});
+
+	$(id('button-filter')).click(function(e) {
+	  page.stopScroll = true;
+	  page.send({
+	    'url': currentQuery.url(0),
+	    'show': true
+	  });
+	});
+
+	$('#special').on('click', function(e) {
+	  e.stopPropagation();
+	});
+
+	$(document).on('click', function (e) {
+	  if($(id('expand')).css('display') != 'none'
+	     && !$(e.target).is(id('expand, ')
+				+ id('expand *, ')
+				+ id('item_filter, ')
+				+ id('item_filter *, ')
+				+ id('item_search, ')
+				+ id('item_search *'))) {
+	    if (search.isOpen) {
+	      search.focus(false);
+	    }
+	    expand.hide();
+	  }
+	});
+
+	if (isHomePage()) {
+	  $(window).scroll(function() {
+	    if($(window).scrollTop() + $(window).height() >= $('#footer').offset().top) {
+	      if (!page.stopScroll) {
+		page.stopScroll = true;
+		page.send({
+		  'url': pageQuery.url(page.currentPage + 1),
+		  'show': true
+		});
+	      }
+	    }
+	  });
+	}
+
+	function resizeExpand() {
+	  function filterColumnsAreEmpty(filterColumns) {
+	    var empty = true;
+	    filterColumns.each(function(index, elem) {
+	      if ($(elem).children().length != 0) {
+		empty = false;
+	      }
+	    });
+	    return empty;
+	  }
+	  if ($(window).width() >= 768 && expandSize != 'large') {
+	    var filterColumns = $("#nb-menu_filters .row:last-child ul");
+	    var tmpColumns = $("#nb-menu_filters .row:first-child ul:nth-of-type(1n+3)");
+	    var i = 0;
+
+	    while(!filterColumnsAreEmpty(tmpColumns)) {
+	      filterColumns.each(function(index, elem) {
+		var child = $(tmpColumns.get(i % 2)).find('li:first-child').detach();
+
+		$(elem).append(child);
+		i += 1;
+	      });
+	    }
+
+	    expandSize = 'large';
+	  } else if ($(window).width() < 768 && expandSize == 'large') {
+	    var filterColumns = $("#nb-menu_filters .row:last-child ul");
+
+	    if ($("#nb-menu_filters .row:first-child ul").length <= 2) {
+	      $("#nb-menu_filters .row:first-child ul:last-of-type")
+		.after('<ul class="col-xs-6 col-sm-3"></ul>');
+	      $("#nb-menu_filters .row:first-child ul:last-of-type")
+		.after('<ul class="col-xs-6 col-sm-3"></ul>');
+	    }
+
+	    var i = 0;
+
+	    while (!filterColumnsAreEmpty(filterColumns)) {
+	      filterColumns.each(function(index, elem) {
+		var child = $(elem).find('li:first-child').detach();
+
+		if (i % 2 == 0) {
+		  $("#nb-menu_filters .row:first-child ul:nth-of-type(0n+3)").append(child);
+		} else {
+		  $("#nb-menu_filters .row:first-child ul:last-of-type").append(child);
+		}
+		i += 1;
+	      });
+	    }
+	    expandSize = 'small';
+	  }
+	}
+
+	if ($(id('filters .row:first-child ul')).length > 2) {
+	  var expandSize = 'small';
+
+	  $(id('filters .row')).after('<div class="row"></div>');
+	  for (var i = 0; i < 4; i++) {
+	    $(id('filters .row:last-child')).append('<ul class="col-xs-6 col-sm-3"></ul>');
+	  }
+
+	  resizeExpand();
+
+	  window.addEventListener('resize', function(event){
+	    resizeExpand();
+	  });
+	}
+      });
+    }
+  }
+})(jQuery);
+
+;/*})'"*/
+;/*})'"*/

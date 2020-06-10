@@ -1,0 +1,263 @@
+#speak-with-rep-block{
+  width: 300px;
+  position: absolute;
+  right: 0;
+}
+
+#cdl-application-form #step-1_form_instructions{
+  margin-bottom: 6rem;
+}
+
+.form-item.form-item-loan-amount label {
+  margin-bottom: -5px;
+}
+
+.form-item-loan-amount .slider.slider-horizontal{
+  display: table;
+  margin: 0 auto;
+  margin-bottom: 51px;
+  width: calc(100% - 50px);
+  max-width: 280px;
+}
+
+#cdl-application-form .form-item{
+  max-width: 500px;
+  margin: 0 auto;
+  margin-bottom: 15px;
+}
+
+#cdl-application-form .fieldset-wrapper{
+  text-align: center;
+}
+
+#cdl-application-form .help-block, .item-list{
+  display: inline-block;
+}
+#cdl-application-form .help-block{
+  position: absolute;
+  margin-left: -60px;
+  margin-top: 32px;
+  color: #263238;
+}
+
+@media (max-width: 767px) {
+  #cdl-application-form .help-block{
+    position: static;
+    margin-left: 0;
+    display: block;
+  }
+}
+
+#cdl-application-form #edit-header .fieldset-wrapper{
+  margin-top: 40px;
+}
+
+#cdl-application-form .form-item-credit-score {
+  margin-bottom: 30px!important;
+}
+
+#cdl-application-form .form-submit{
+  margin: 0 auto;
+  display: table;
+  margin-top: 60px;
+  width: auto;
+}
+#cdl-application-form input[type="radio"]{
+  margin-top: 0;
+
+}
+#cdl-application-form  .form-type-radio{
+  display: inline-block;
+  padding-right: 20px;
+}
+
+/* START radio button and checkbox */
+#cdl-application-form input[type="radio"], input[type="checkbox"]:not(#edit-terms) {
+  width: 18px!important;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #9c9c9c;
+  background: #4a90e2;
+  outline: none;
+  vertical-align: middle;
+  appearance: none;
+  border-radius: 15px!important;
+  transition: all .3s ease-in-out;
+  -webkit-appearance: none!important;
+  position: relative;
+  right: unset;
+  bottom: 4px;
+  margin-right: 5px;
+}
+#cdl-application-form input[type="radio"], input[type="checkbox"]:not(#edit-terms) {
+  box-shadow: inset 0 0 0 12px #fff;
+}
+#cdl-application-form input[type="radio"]:checked, input[type="checkbox"]:checked:not(#edit-terms) {
+  box-shadow: inset 0 0 0 4px #fff;
+}
+#cdl-application-form input[type="checkbox"]:not(#edit-terms) {
+  border-radius: 5px!important;
+}
+#cdl-application-form input:focus {
+  outline-style:none!important;
+  border-color:transparent!important;
+}
+
+#cdl-application-form #edit-loading {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.8);
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+}
+
+#cdl-application-form #edit-loading #loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+#cdl-application-form #edit-loading #loading p {
+  display: inline-block;
+  color: white;
+  text-align: center;
+}
+
+.checkbox input[type="checkbox"]:not(#edit-terms) {
+  position: relative;
+}
+
+/* END radio button */
+
+#lead-form-panel{
+  position: absolute;
+  z-index: 1000;
+  background-color: white;
+  border-radius: 10px;
+  padding: 20px!important;
+  margin-top: 90px;
+}
+.page-admin #lead-form-panel {
+  position: static;
+  margin-top: 0;
+  padding: 0 !important;
+  border-radius: 0;
+  background: transparent;
+}
+
+#page-apply #lead-form-panel {
+  margin-top: 200px;
+}
+#lead-form-panel .form-item-loan-amount {
+  margin-top:50px;
+  /*overflow: hidden;*/
+}
+#lead-form-panel .form-item-loan-amount label{
+  display: none;
+}
+#lead-form-panel .form-item-loan-amount .slider{
+  margin-bottom:30px!important;
+}
+
+#lead-form-panel input[type="submit"] {
+  display: inline-block;
+  margin-bottom: 0;
+}
+
+#lead-form-panel .form-item {
+  margin-bottom: 10px;
+}
+
+#panel-bootstrap-region-hero h2{
+  white-space: nowrap;
+  color: white;
+  margin-top: 20px;
+  margin-left: -15px;
+}
+#panel-bootstrap-column-main-column{
+  /*padding-left: 0px;*/
+}
+@media (max-width: 991px) {
+  #speak-with-rep-block{
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  #cdl-application-lead-form .slider {
+    width: 240px;
+  }
+}
+
+@media (max-width: 767px) {
+  #lead-form-panel{
+    margin-left: 0px;
+    /*width: calc(100vw - 30px);*/
+  }
+
+  #lead-form-panel .btn {
+    width: auto;
+    max-width: 100%;
+    /*white-space: initial;*/
+  }
+
+  #lead-form-panel .btn.btn-info {
+    padding: 0 5px 0 0;
+  }
+
+  #speak-to-rep-hero {
+    display: none;
+  }
+}
+@media (max-width: 567px) {
+  #lead-form-panel{
+    width: calc(100vw - 30px);
+  }
+}
+
+.slider.slider-horizontal .slider-tick-label-container .slider-tick-label {
+  width: auto !important;
+  margin-left: 0 !important;
+  transform: translateX(-50%);
+}
+
+#cdl-application-code-form label,
+#cdl-application-code-form--2 label {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0377be;
+  text-align: center;
+  margin-bottom: 10px;
+}
+#edit-back {
+  margin-top: -27px!important;
+}
+
+#cdl-application-code-form {
+  padding: 15px;
+  background-color: #fff;
+  border-radius: 10px;
+  margin-left: 0;
+  box-shadow: 0 10px 20px rgba(0,0,0,.19), 0 6px 6px rgba(0,0,0,.23);
+  width: 100%;
+  max-width: 550px;
+  margin-left:auto;
+  margin-right: auto;
+}
+
+#cdl-application-code-form input[type="submit"] {
+  display: inline-block;
+  margin-bottom: 0;
+}
+
+#cdl-application-code-form .no-access-code,
+#cdl-application-code-form--2 .no-access-code {
+  float: right;
+  margin-bottom: 0;
+  line-height: 25px;
+}
