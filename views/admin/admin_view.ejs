@@ -1,0 +1,41 @@
+  <!-- content -->
+<%- include("../partials/admin_header") -%>
+<div class="container-fluid content-top-gap">
+    <p>View full table >> <a  href="/all_users"><button class="btn btn-primary">Full Table</button></a></p>
+    <div class="row">
+        <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2"></div>
+        <div class="col-sm-12 col-md-8 col-lg-8 col-xl-8">
+            <table class="table table-responsive table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Last Name</th>
+                        <th>Phone Number</th>
+                        <th>Loan Amount</th>
+                        <th>Status</th>
+                        <th>Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% doc.forEach(user =>{ %>
+                    <tr>
+                        <td><%= user.name %> </td>
+                        <td><%= user.last_name %></td>
+                        <td><%= user.phone %></td>
+                        <td><%= user.loan_amount %></td>
+                        <td><%= user.status %></td>
+                        <td><%= user.email %></td>
+                    </tr>
+                    <% }) %>  
+                </tbody>
+            </table>
+        </div>
+        <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2"></div>
+    </div>
+</div>
+    
+    
+  </div>
+  <!-- //content -->
+
+  <%- include("../partials/admin_footer") -%>

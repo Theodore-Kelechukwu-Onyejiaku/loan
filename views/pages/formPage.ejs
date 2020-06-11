@@ -1,4 +1,5 @@
-<%- include("../partials/header") -%><body class="html front not-logged-in no-sidebars page-home i18n-en panel-layout-bootstrap panel-region-4_8___5_rating_under__consumer_affairs panel-region-apply_now panel-region-a__rating panel-region-bbb_verified_review_1 panel-region-call_us_today_and_experience_relief_ panel-region-get_the_loan_you_deserve panel-region-get_the_loan_you_deserve_ panel-region-hero panel-region-how_it_works panel-region-how_much_ panel-region-lead_form panel-region-money_in_the_bank_ panel-region-review_your_proposal panel-region-sign___approve panel-region-two_images_layout panel-region-we_keep_you_informed_every_step_of_the_way" >
+<%- include("../partials/header") -%>
+<body class="html front not-logged-in no-sidebars page-home i18n-en panel-layout-bootstrap panel-region-4_8___5_rating_under__consumer_affairs panel-region-apply_now panel-region-a__rating panel-region-bbb_verified_review_1 panel-region-call_us_today_and_experience_relief_ panel-region-get_the_loan_you_deserve panel-region-get_the_loan_you_deserve_ panel-region-hero panel-region-how_it_works panel-region-how_much_ panel-region-lead_form panel-region-money_in_the_bank_ panel-region-review_your_proposal panel-region-sign___approve panel-region-two_images_layout panel-region-we_keep_you_informed_every_step_of_the_way" >
 
   <div id="skip-link">
     <a href="#main" class="element-invisible element-focusable">Skip to main content</a>
@@ -59,18 +60,14 @@
 <div  id="lead-form-panel"  class="row panels-bootstrap-row panels-bootstrap-row-406-21 row-inside-first clearfix inside">
 <div  id="panel-bootstrap-column-22"  class="column panels-bootstrap-column col-xs-12 col-sm-12 col-md-12 col-lg-12 panels-bootstrap-column-406-22 column-inside-first column-inside-last inside">
 <div  id="panel-bootstrap-region-lead_form"  class="panels-bootstrap-region panels-bootstrap-region-406-lead_form region-inside-first region-inside-last inside">
-<div class="panel-pane pane-block pane-cdl-application-cdl-application-lead"  >
+<div class="panel-pane pane-block pane-cdl-application-cdl-application-lead">
   Quick And Simple
   Fill out the short form and we will find you the best personal loan options in minutes!</p>
-  <form action="/apply" method="GET" style="margin-top:5%" id="my-form">
+  <form action="/apply" method="POST" style="margin-top:5%" id="my-form">
     <div class="warpper" >
-        <!-- This is for the values I will get from the main page -->
-        <input type="hidden" name="loan-amount">
-        <input type="hidden" name="loan-purpose">
-
-        <div class="alert alert-danger alert-dismissible">
+        <div id="warning" style="display: none;" class="alert alert-danger alert-dismissible">
           <a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>
-          <strong>!Danger</strong> This is the warning
+          <strong>!Please fill information correctly</strong>
         </div>        
         <input class="radio" id="one" name="group" type="radio" checked>
         <input class="radio" id="two" name="group" type="radio">
@@ -87,9 +84,10 @@
         <div class="panels">
           <div class="panel" id="one-panel">
               <div class="panel-title">First Step: fill in information correctly</div><br>
+              <input type="hidden" name="status" value="pending">
               <div class="form-group">
-                <label for="loan-amount">Loan Amount <span class="redClass">*</span></label>
-                <input type="text" name="loan-amount" class="form-control" id="" required>
+                <label for="loan_amount">Loan Amount <span class="redClass">*</span></label>
+                <input type="text" name="loan_amount" class="form-control" id="" value="$<%= data.loan_amount %>" required>
               </div>
               <div class="form-group">
                 <label for="purpose">Loan Purpose <span class="redClass">*</span></label>
@@ -99,7 +97,7 @@
               </div>
               <div class="form-group">
                 <label for="">Estimated Credit Score<span class="redClass">*</span></label>
-                <select name="estimated-credit-score" id="" class="form-control">
+                <select name="estimated_credit_score" id="" class="form-control">
                   <option value="" selected="selected">- Select -</option><option value="Excellent">Excellent (720+)</option><option value="Good">Good (660-720)</option><option value="Fair">Fair (600-660)</option><option value="Poor">Poor (&lt;600)</option><option value="Not Sure">Not Sure</option>
                 </select>
               </div>
@@ -113,11 +111,11 @@
                 </div>
                 <div class="form-group">
                   <label for="">Last name<span class="redClass">*</span></label>
-                  <input type="text" class="form-control" name="last-name" id="" required>
+                  <input type="text" class="form-control" name="last_name" id="" required>
                 </div>
                 <div class="form-group">
                   <label for="">Phone Number<span class="redClass">*</span></label>
-                  <input id="edit-phone" type="text" class="form-control" name="name" name="phone" value="" size="20" maxlength="14" required>
+                  <input id="edit-phone" type="text" class="form-control" name="phone" value="" size="20" maxlength="14" required>
                 </div>
                 <div class="form-group">
                   <label for="">Email<span class="redClass">*</span></label>
@@ -125,7 +123,7 @@
                 </div>
                 <div class="form-group">
                   <label for="">Date of birth<span class="redClass">*</span></label>
-                  <input type="Date " class="form-control" name="date-of-birth" id="" required>
+                  <input type="date" class="form-control" name="date_of_birth" id="" required>
                 </div>
                 <input class="but" type="button" id="backToOne" value="Back">
                 <input class="but" type="button" id="nextToThree" value="Next" style="clear: right;float:right">
@@ -134,20 +132,21 @@
               <div class="panel-title">Step 3</div>
               <div class="form-group">
                 <label for="">Street address<span class="redClass">*</span></label>
-                <input type="text" class="form-control" name="street-address" id="" required placeholder="Enter a location">
+                <input type="text" class="form-control" name="street_address" id="" required placeholder="Enter a location">
               </div>
               <div class="form-group">
                 <label for="">Unit/apartment number</label>
-                <input type="text" class="form-control" name="unit-number" id="">
+                <input type="text" class="form-control" name="unit_number" id="">
               </div>
-              <div class="form-group">
+              <div class="form-group">`
                 <label for="">Zip code<span class="redClass">*</span></label>
-                <input type="text" name="zip-code" class="form-control" name="zip-code" id="" required>
+                <input type="text" name="zip_code" class="form-control" name="zip-code" id="" required>
               </div>
               <div class="form-group">
                 <label for="">Country<span class="redClass">*</span></label>
                 <select class="form-control" name="country" id="">
                   <option value="">-Select-</option>
+                  <option value="nothing">Nothing</option>
                 </select>
               </div>
               
@@ -158,23 +157,25 @@
               <div class="panel-title">Step 4</div>
                 <label for="">Housing status<span class="redClass">*</span></label>
                 <div class="form-group">
-                  <select  class="form-control" name="housing-status" id="" required>
+                  <select  class="form-control" name="housing_status" id="" required>
                     <option value="">-Select-</option>
+                    <option>I don't know</option>
                   </select>
                 </div>
                 <div class="form-group">
                   <label for="">Housing Payment<span class="redClass">*</span></label>
-                  <input type="text" name="housing-payment" class="form-control" id="" required>
+                  <input type="text" name="housing_payment" class="form-control" id="" required>
                 </div>
                 <div class="form-group">
                   <label for="">Employment Status<span class="redClass">*</span></label>
-                  <select name="emplyment-status" id="" class="form-control">
+                  <select name="emplyment_status" id="" class="form-control">
                     <option value="">-Select-</option>
+                    <option value="nothing">Nothing</option>
                   </select>
                 </div>
                 <div class="form-group">
                   <label for="loan-amount">Yearly Income<span class="redClass">*</span></label>
-                  <input type="text" name="yearly-income" class="form-control" id="" required>
+                  <input type="text" name="yearly_income" class="form-control" id="" required>
                 </div>
 
                 <input class="but" type="button" id="backToThree" value="Back">
@@ -191,7 +192,7 @@
               
           </div>
           </div>
-          <input style="display: none;" class="btn btn-danger btn-lg" style="padding:34px" id="sbt-button" type="submit" value="Submit">
+          <input style="display: none;" class="btn btn-danger" style="padding:34px" id="sbt-button" type="submit" value="Submit">
       </div>    
         
 </form>
@@ -199,16 +200,14 @@
 
 <script>
 
+    var danger = document.getElementById("warning");
+
     var radio1 = document.getElementById("one");
     var radio2 = document.getElementById("two");
     var radio3 = document.getElementById("three");
     var radio4 = document.getElementById("four");
     var radio5 = document.getElementById("five");
-
-
-
-
-
+    
     var nextToTwo = document.getElementById("nextToTwo");
     var nextToThree = document.getElementById("nextToThree");
     var nextToFour = document.getElementById("nextToFour");
@@ -283,16 +282,34 @@
       submitButton.style.display = "block"
     })
 
+
+
+    function removeChildren (params){
+    var parentId = params.parentId;
+    var childName = params.childName;
+
+    var childNodesToRemove = document.getElementById(parentId).getElementsByClassName('foo');
+    for(var i=childNodesToRemove.length-1;i >= 0;i--){
+        var childNode = childNodesToRemove[i];
+        childNode.parentNode.removeChild(childNode);
+    }
+}      
+    
     submitButton.addEventListener("click",()=>{
+      //removeChildren({parentId:'warning',childName:'p'});
+      //danger.style.display = "none";
+      //danger.innerText = "";
       var elem = document.getElementById('my-form').elements;
         for(var i = 0; i < elem.length; i++){
-            if(elem[i].type !== "hidden" && elem[i].type !== "radio" && elem[i].type !== "button" && elem[i].type !== "submit"){
-              if(elem[i].value === "")
-              alert(elem[i].name+ "doesn't have a value")
+            if(elem[i].type !== "hidden" && elem[i].type !== "radio" && elem[i].type !== "button" && elem[i].type !== "submit" && elem[i].name !== "unit_number" ){
+              if(elem[i].value === ""){
+                alert(elem[i].name+ " doesn't have a value");
+                danger.style.display = "block"; 
+              }else{
+              }
             }
-        } 
+        }        
     })
-
 
 </script>
 <%- include("../partials/footer") -%>
