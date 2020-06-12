@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+
+</head>
+<body>
+    <div class="container-fluid content-top-gap">
+        <div class="row">
+            <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2"></div>
+            <div class="col-sm-12 col-md-8 col-lg-8 col-xl-8">
+              <div class="card" style="width: 100%">
+                <h1 class="text-center"><%= doc.name %></h1><hr>
+                <div class="card-body">
+                  <h6 class="card-title">Name: <span class="text-info"><%= doc.name %></span></h6>
+                  <h6 class="card-title">Last Name:  <span class="text-info"><%= doc.last_name %></span></h6>
+                  <h6 class="card-title">Phone Number: <span class="text-info"><%= doc.phone %></span></h6>
+                  <h6 class="card-title">Loan Amount: <span class="text-info"><%= doc.loan_amount %></span></h6>
+                  <% if(doc.status === "pending"){ %>
+                    <h2 class="card-title">Status: <span style="padding:1%" class="p-1 bg-warning text-white">Pending</span></h2>
+                  <%}else if(doc.status === "declined"){  %>
+                    <h2 class="card-title">Status: <span style="padding:1%" class="p-1 bg-danger text-white">Declined</span></h2>
+                  <%}else{  %>
+                    <h2 class="card-title">Status: <span style="padding:1%" class=" bg-success text-white">Approved</span></h2>
+                  <% } %>
+                  <h6 class="card-title">Email: <span class="text-info"><%= doc.email %></span></h6>
+                  <h6 class="card-title">Country: <span class="text-info"><%= doc.country %></span></h6>
+                  <h6 class="card-title">Yearly Income: <span class="text-info"><%= doc.yearly_income %></span></h6>
+                  <h6 class="card-title">Purpose: <span class="text-info"><%= doc.purpose %></span></h6>
+                  <h6 class="card-title">Estimated Credit Score: <span class="text-info"><%= doc.estimated_credit_score%></span></h6>
+                  <h6 class="card-title">Date of Birth: <span class="text-info"><%= doc.date_of_birth %></span></h6>
+                  <h6 class="card-title">Street Address: <span class="text-info"><%= doc.street_address %></span></h6>
+                  <h6 class="card-title">Unit Number: <span class="text-info"><%= doc.unit_number %></span></h6>
+                  <h6 class="card-title">Zip Code: <span class="text-info"><%= doc.zip_code %></span></h6>
+                  <h6 class="card-title">Housing Payment <span class="text-info"><%= doc.housing_payment %></span></h6>
+              </div>
+              <div class="text-center">
+                  <a href="/" class="btn btn-danger"><i class="fa fa-signout">Logout</i></a>
+              </div>
+            </div>
+          <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2"></div>
+        </div>
+        </div>
+          
+</body>
+</html>
+  

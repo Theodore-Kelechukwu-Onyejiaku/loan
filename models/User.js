@@ -17,7 +17,7 @@ var UserSchema = new mongoose.Schema({
     housing_payment: {type: String},
     employment_status: {type: String},
     yearly_income: {type: String},
-    status : {type: String, enum: ["pending", "declined", "approved"]}
+    status : {type: String, enum: ["pending", "decline", "approved"]}
 });
 
 

@@ -61,12 +61,29 @@
   <div  id="panel-bootstrap-column-22"  class="column panels-bootstrap-column col-xs-12 col-sm-12 col-md-12 col-lg-12 panels-bootstrap-column-406-22 column-inside-first column-inside-last inside">
   <div  id="panel-bootstrap-region-lead_form"  class="panels-bootstrap-region panels-bootstrap-region-406-lead_form region-inside-first region-inside-last inside">
   <div class="panel-pane pane-block pane-cdl-application-cdl-application-lead"  >
-<div class="container text-center text-info" >
-    Error
-    <div class="container">
-        <img src="/img/error.png" alt="success gif" class="image-responsive">
+<div class="container text-info" >
+    <div class="text-center">
+      <h3 class="text-info">Login</h3>
+      <% var error; %>
+      <h4 class="text-danger"><%= error %></h4>
     </div>
-    
+    <div class="row">
+      <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2"></div>
+      <div class="col-sm-12 col-md-8 col-lg-8 col-xl-8">
+      <form action="/login" method="POST" autofocus>
+        <div class="form-group">
+          <label>Email address</label>
+          <input type="email" name="email" placeholder="email address" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" name="password" placeholder="************" class="form-control" required>
+        </div>
+        <input type="submit" class="btn btn-primary" value="login">
+      </form>
+    </div>
+    <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2"></div>
+</div>
 </div>
 
 <%- include("../partials/footer") -%>

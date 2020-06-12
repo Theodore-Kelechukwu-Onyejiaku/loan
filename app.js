@@ -67,11 +67,15 @@ app.post("/form-page", (req, res)=>{
     res.render("pages/formPage", {data : req.body});
 })
 
+//Login Page
+app.get("/login", (req, res)=>{
+    res.render("pages/login")
+})
+
 //TESTING ALL UNPROTECTED ROUTES
 app.get("/admin", (req, res)=>{
     User.find((err, doc)=>{
         if(!err){
-            console.log(doc)
             res.render("admin/admin_view", {doc : doc});
         }else{
             res.render("pages/error")
@@ -84,9 +88,49 @@ app.get("/admin", (req, res)=>{
 app.get("/all_users", (req, res)=>{
     User.find((err, doc)=>{
         if(!err){
-            console.log(doc)
-            res.render("admin/all_users", {doc : doc});
+            var total =  doc.length;
+            res.render("admin/all_users", {doc : doc, total});
         }else{
+            res.render("pages/error")
+        }
+    })
+})
+
+//get all users approved 
+app.get("/all_users/approved", (req, res)=>{
+    User.find({"status": "approved"}, (err, doc)=>{
+        if(!err){
+            var total =  doc.length;
+            console.log(doc)
+            res.render("admin/all_users", {doc : doc, total});
+        }else{
+            console.log("documents not found")
+            res.render("pages/error")
+        }
+    })
+})
+
+//get all users pending
+app.get("/all_users/pending", (req, res)=>{
+    User.find({"status": "pending"}, (err, doc)=>{
+        if(!err){
+            var total =  doc.length;
+            res.render("admin/all_users", {doc : doc, total});
+        }else{
+            console.log("documents not found")
+            res.render("pages/error")
+        }
+    })
+})
+
+//get all users declined
+app.get("/all_users/declined", (req, res)=>{
+    User.find({"status": "declined"}, (err, doc)=>{
+        if(!err){
+            var total =  doc.length;
+            res.render("admin/all_users", {doc : doc, total});
+        }else{
+            console.log("documents not found")
             res.render("pages/error")
         }
     })
@@ -96,10 +140,8 @@ app.get("/all_users", (req, res)=>{
 app.get("/:id/delete", (req, res)=>{
     User.findByIdAndRemove(req.params.id, (err, doc)=>{
         if(!err){
-            console.log("Removed Document")
             res.redirect("/all_users")
         }else{
-            console.log("Document not removed")
             res.render("pages/error")
         }
     })
@@ -109,10 +151,8 @@ app.get("/:id/delete", (req, res)=>{
 app.get("/:id/edit", (req, res)=>{
     User.findById(req.params.id, (err, doc)=>{
         if(!err){
-            console.log("Document Found")
             res.render("admin/update", {doc: doc})
         }else{
-            console.log("Document not found")
             res.render("pages/error")
         }
     })
@@ -121,7 +161,6 @@ app.get("/:id/edit", (req, res)=>{
 
 //Success Page
 app.post("/apply", (req, res)=>{
-    console.log(req.body);
     var user = new User();
     user.loan_amount = req.body.loan_amount
     user.purpose = req.body.purpose,
@@ -142,14 +181,35 @@ app.post("/apply", (req, res)=>{
     user.status = req.body.status
     user.save((err, doc)=>{
         if(!err){
-            console.log("Inserted to database")
             res.render("pages/application_success");
         }else{
-            console.log("Error: "+err)
             res.render("pages/error")
         }
     })    
 })
+
+app.post("/update_user", (req, res)=>{
+    User.findOneAndUpdate({_id: req.body._id}, req.body, {new: true}, (err, doc)=>{
+        if(!err){
+            res.redirect("/all_users")
+        }else{
+            res.render("pages/error")
+        }
+    })
+})
+
+//Submission during log in
+app.post("/login", (req, res)=>{
+    console.log(req.body);
+    User.findOne({"email": req.body.email, "_id": req.body.password}, (err, doc)=>{
+        if(!err){
+            res.render("pages/logout", {doc : doc})
+        }else{
+            res.render("pages/login", {error : "User not found"})
+        }
+    })
+})
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, ()=>{

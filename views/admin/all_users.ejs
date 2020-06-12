@@ -2,43 +2,53 @@
   <%- include("../partials/admin_header") -%>
   <div class="container-fluid content-top-gap">
       <div class="row">
-          <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2">
+          <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2"></div>
           <div class="col-sm-12 col-md-8 col-lg-8 col-xl-8">
+
+                    <% if(doc){ %>
+                      <div class="text-center">
+                        <h1>Total: <span class="label"><%= total %></span></h1>
+                      </div>
                       <% doc.forEach(user =>{ %>
-                        <div class="card" style="width: 100%;">
+                        <div class="card mb-5" style="width: 100%;">
                             <div class="card-body">
-                          <h6 class="card-title">Name: <span class="text-info"><%= user.name %></span></h6>
-                          <h6 class="card-title">Last Name:  <span class="text-info"><%= user.last_name %></span></h6>
-                          <h6 class="card-title">Phone Number: <span class="text-info"><%= user.phone %></span></h6>
-                          <h6 class="card-title">Loan Amount: <span class="text-info"><%= user.loan_amount %></span></h6>
-                          
-                          <% if(user.status === "pending"){ %>
-                            <h6 class="card-title">Status: <span class="p-1 bg-warning text-white">Pending</span></h6>
-                          <%}else if(user.status === "declined"){  %>
-                            <h6 class="card-title">Status: <span class="p-1 bg-danger text-white">Declined</span></h6>
-                          <%}else{  %>
-                            <h6 class="card-title">Status: <span class="p-1 bg-success text-white">Approved</span></h6>
-                          <% } %>
-                          <h6 class="card-title">Email: <span class="text-info"><%= user.email %></span></h6>
-                          <h6 class="card-title">Country: <span class="text-info"><%= user.country %></span></h6>
-                          <h6 class="card-title">Yearly Income: <span class="text-info"><%= user.yearly_income %></span></h6>
-                          <h6 class="card-title">Purpose: <span class="text-info"><%= user.purpose %></span></h6>
-                          <h6 class="card-title">Estimated Credit Score: <span class="text-info"><%= user.estimated_credit_score%></span></h6>
-                          <h6 class="card-title">Date of Birth: <span class="text-info"><%= user.date_of_birth %></span></h6>
-                          <h6 class="card-title">Street Address: <span class="text-info"><%= user.street_address %></span></h6>
-                          <h6 class="card-title">Unit Number: <span class="text-info"><%= user.unit_number %></span></h6>
-                          <h6 class="card-title">Zip Code: <span class="text-info"><%= user.zip_code %></span></h6>
-                          <h6 class="card-title">Housing Payment <span class="text-info"><%= user.housing_payment %></span></h6>
-                          <a href="/<%= user._id %>/edit" class="btn btn-success"> <i class="fa fa-pencil"></i> Update</a>
-                          <a href="/<%= user._id %>/delete" class="btn btn-danger" onclick="return confirm('are you sure you want to delete this record');">Delete X</a>
+                                <h6 class="card-title">Name: <span class="text-info"><%= user.name %></span></h6>
+                                <h6 class="card-title">Last Name:  <span class="text-info"><%= user.last_name %></span></h6>
+                                <h6 class="card-title">Phone Number: <span class="text-info"><%= user.phone %></span></h6>
+                                <h6 class="card-title">Loan Amount: <span class="text-info"><%= user.loan_amount %></span></h6>
+                                
+                                <% if(user.status === "pending"){ %>
+                                  <h6 class="card-title">Status: <span class="p-1 bg-warning text-white">Pending</span></h6>
+                                <%}else if(user.status === "declined"){  %>
+                                  <h6 class="card-title">Status: <span class="p-1 bg-danger text-white">Declined</span></h6>
+                                <%}else{  %>
+                                  <h6 class="card-title">Status: <span class="p-1 bg-success text-white">Approved</span></h6>
+                                <% } %>
+                                  <hr>
+                                    <h5 class="card-title">Email: <span class="text-info"><%= user.email %></span></h5>
+                                    <h5 class="card-title">Password: <span class="text-info"><%= user._id %></span></h5>
+                                  <hr>
+                                  <h6 class="card-title">Country: <span class="text-info"><%= user.country %></span></h6>
+                                  <h6 class="card-title">Yearly Income: <span class="text-info"><%= user.yearly_income %></span></h6>
+                                  <h6 class="card-title">Purpose: <span class="text-info"><%= user.purpose %></span></h6>
+                                  <h6 class="card-title">Estimated Credit Score: <span class="text-info"><%= user.estimated_credit_score%></span></h6>
+                                  <h6 class="card-title">Date of Birth: <span class="text-info"><%= user.date_of_birth %></span></h6>
+                                  <h6 class="card-title">Street Address: <span class="text-info"><%= user.street_address %></span></h6>
+                                  <h6 class="card-title">Unit Number: <span class="text-info"><%= user.unit_number %></span></h6>
+                                  <h6 class="card-title">Zip Code: <span class="text-info"><%= user.zip_code %></span></h6>
+                                  <h6 class="card-title">Housing Payment <span class="text-info"><%= user.housing_payment %></span></h6>
+                                  <a href="/<%= user._id %>/edit" class="btn btn-success"> <i class="fa fa-pencil"></i> Update</a>
+                                  <a href="/<%= user._id %>/delete" class="btn btn-danger" onclick="return confirm('are you sure you want to delete this record');">Delete X</a>
                             </div>
-                          </div>
-                          <% }) %>  
+                        </div>
+                      <% }) %>  
+                    <%  } else{ %>
+                            <h1 class="text-danger text-center">Nothing Found Please</h1>
+                    <% } %>
           </div>
           <div class="col-sm-12 col-md-2 col-lg-2 col-xl-2"></div>
       </div>
   </div>
-</div>
     <!-- //content -->
   
     <%- include("../partials/admin_footer") -%>
